@@ -1,0 +1,174 @@
+---
+title: "WORKFLOW for data analyses of Fuquene record"
+author: 'Author: Xavier Benito (xavier.benito.granell@gmail.com)'
+date: 'Date: 11/05/2022'
+output:
+  html_notebook: default
+  pdf_document: default
+---
+
+## Introduction
+This workflow is written as a R Markdown document to show initial exploratory analyses of paleoclimatic and paleoenvironmental evolution of Lake Fuquene (Colombia, 2540m elevation, 5°27′N, 73°46′W). This document shows the most relevant code. See R files within the folder "scripts" for a more specific code. 
+
+## Study area and datasets description
++ **Lake Fuquene**: Pleistocene in origin, morrained-dammed tropical lake located in the Eastern Cordiellera of Colombian Andes. Water depth=2-6 m
+
+Three sediment cores, composite of 250 kyr diatom, geochemical and pollen record:
+  + **F9**: 60-m long, sampled for diatom, pollen and geochemistry
+  + **F7**: sampled for diatoms
+  + **M1**: sampled for diatoms and pollen
+
+
+## Load packages 
+```{r packages, include=FALSE}
+library(analogue)
+library(tidyverse)
+library(vegan)
+library(analogue)
+library(mgcv)
+library(ggplot2)
+library(gratia)
+```
+
+
+## Step 1: Estimate Principal Curves (PrC) of the diatom data
+PrC is a nonlinear ordination technique that extracts a single gradient of variation from multivariate data.
+
+# Clean data
+```{r principal curves diatoms, echo=TRUE, error=FALSE, message=FALSE, warning=FALSE}
+
+F_diatoms <- read.csv("data/Fuquene_diatoms_counts.csv") %>%
+  rename(core=ï..core) #rename extraneous column name 
+
+agedepth <- F_diatoms[, names(F_diatoms) %in% c("depth", "upper_age", "lower_age", "core")] 
+diat <- F_diatoms[, !names(F_diatoms) %in% c("depth", "upper_age", "lower_age", "core")]
+diat[is.na(diat)] <- 0
+
+diatoms_save <- cbind(agedepth, diat)
+
+#this is to transform to tidy format, calculate % and subset more common species
+new <- diatoms_save %>% 
+  gather(key = taxa, value = count, -depth, -upper_age, -lower_age, -core) %>%
+  #mutate(taxa = plyr::mapvalues(taxa, from = changes[,1], to = changes$new_2)) %>%
+  group_by(depth, taxa, upper_age, lower_age) %>%
+  summarise(count = sum(count)) %>%
+  filter(!count == "0" ) %>% #this is to remove empty samples (rows)
+  filter(!upper_age==0.0) %>% #this is to drop extraneous ages
+  ungroup() %>%
+  group_by(depth) %>%
+  mutate(relative_abundance_percent = count / sum(count) * 100) %>%
+  ungroup()
+
+# filter more abundant taxa; format need to be on long-wide format-->no spreaded 
+core_common_taxa <- new %>%
+  group_by(taxa) %>%
+  summarise(max_rel_abund = max(relative_abundance_percent)) %>%
+  filter(max_rel_abund >= 5) %>%
+  arrange(max_rel_abund) %>%
+  pull(taxa)
+
+# select from initial table
+core_counts_common <- new %>%
+  filter(taxa %in% core_common_taxa) %>%
+  mutate(taxa = factor(taxa, levels = core_common_taxa)) %>%
+  arrange(taxa)
+
+#make it wide
+core_counts_wide <- core_counts_common %>%
+  select(depth, upper_age, lower_age, taxa, relative_abundance_percent) %>%
+  spread(key = taxa, value = relative_abundance_percent) 
+
+```
+
+# Estime PrC and plot trends
+
+```{r PrC, echo=FALSE, error=FALSE, message=FALSE, warning=FALSE}
+## extract agedepth variables
+agedepth <- core_counts_wide[,names(core_counts_wide) %in% c("depth", "upper_age", "lower_age")]
+diatoms <- core_counts_wide[,!(names(core_counts_wide) %in% c("upper_age", "lower_age", "depth"))]
+
+# Transform data to Hellinger form
+diatoms[is.na(diatoms)] <- 0 #Replace NA (if any) by 0
+diat_hell <- decostand(diatoms, method="hellinger")
+
+# Run Principal Curves
+diat_prc <- prcurve(diat_hell, method = "ca", trace = TRUE, vary = TRUE, penalty = 1.4)
+
+## Extract position on the curve
+scrs_prc <- scores(diat_prc, display = "curve")
+
+# Combine dataframe with ages and depths
+diatomsPrC <- cbind(agedepth, scrs_prc)
+
+# Plot Pcurves with depth and ages
+diat_plt_prc <- ggplot(diatomsPrC, aes(x = upper_age, y = PrC)) +
+  geom_line() + geom_point() +
+  labs(y = "PrC", x = "Age (cal yr BP)", title = "") +
+  ggtitle("Diatoms PrC") +
+  theme_bw()
+diat_plt_prc
+
+```
+
+## Step 2: Estimate Principal Curves (PrC) of the pollen data
+```{r pollen data, echo=FALSE, warning=FALSE}
+F_pollen <- read.csv("data/Fuquene_pollen_counts.csv") %>%
+  rename(depth=ï..depth) %>% #rename extraneous column name  
+  select(-c(contains("Lycopo") | contains("Tot.LocTot.100")))  
+
+names(F_pollen)
+
+#this is to transform to tidy format, calculate % and subset more common species
+pollen_long <- F_pollen %>% 
+  gather(key = taxa, value = count, -depth, -upper_age, -lower_age) %>%
+  #mutate(taxa = plyr::mapvalues(taxa, from = changes[,1], to = changes$new_2)) %>%
+  group_by(depth, taxa, upper_age, lower_age) %>%
+  summarise(count = sum(count)) %>%
+  filter(!count == "0" ) %>% #this is to remove empty samples (rows)
+  filter(!upper_age==0.0) %>% #this is to drop extraneous ages
+  ungroup() %>%
+  group_by(depth) %>%
+  mutate(relative_abundance_percent = count / sum(count) * 100) %>%
+  ungroup()
+
+# filter more abundant taxa; format need to be on long-wide format-->no spreaded 
+core_common_taxa <- pollen_long %>%
+  group_by(taxa) %>%
+  summarise(max_rel_abund = max(relative_abundance_percent)) %>%
+  filter(max_rel_abund >= 5) %>%
+  arrange(max_rel_abund) %>%
+  pull(taxa)
+
+# select from initial table
+core_counts_common <- pollen_long %>%
+  filter(taxa %in% core_common_taxa) %>%
+  mutate(taxa = factor(taxa, levels = core_common_taxa)) %>%
+  arrange(taxa)
+
+#make it wide
+core_counts_wide <- core_counts_common %>%
+  select(depth, upper_age, lower_age, taxa, relative_abundance_percent) %>%
+  spread(key = taxa, value = relative_abundance_percent) 
+
+agedepth <- core_counts_wide[,names(core_counts_wide) %in% c("depth", "upper_age", "lower_age")]
+pollen <- core_counts_wide[,!(names(core_counts_wide) %in% c("upper_age", "lower_age", "depth"))]
+pollen[is.na(pollen)] <- 0 #Replace NA (if any) by 0
+
+# Transform data to Hellinger form
+pollen_hell <- decostand(pollen, method="hellinger")
+
+# Run Principal Curves and extract scores for then combining the resulting dataframe with agedepth
+pollen.prc <- prcurve(pollen_hell, method = "ca", trace = TRUE, vary = TRUE, penalty = 1.4)
+scrs_prc <- scores(pollen.prc, display = "curve")
+
+PollenPrC <- cbind(agedepth, scrs_prc)
+
+# Plot Pcurves with depth and ages
+PollenPlot <- ggplot(PollenPrC, aes(x = upper_age, y = PrC)) +
+  geom_line() + geom_point() +
+  labs(y = "Pollen PrC", x = "Age (cal yr BP)", title = "") +
+  ggtitle("Agropastoralism PrC")
+PollenPlot
+
+```
+
