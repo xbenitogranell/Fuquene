@@ -10,17 +10,25 @@ output:
 ## Introduction
 This workflow is written as a R Markdown document to show initial exploratory analyses of paleoclimatic and paleoenvironmental evolution of Lake Fuquene (Colombia, 2540m elevation, 5°27′N, 73°46′W). This document shows the most relevant code. See R files within the folder "scripts" for a more specific code. 
 
-## Study area and datasets description
+### Study area and datasets description
 + **Lake Fuquene**: Pleistocene in origin, morrained-dammed tropical lake located in the Eastern Cordiellera of Colombian Andes. Water depth=2-6 m
 
-Three sediment cores, composite of 250 kyr diatom, geochemical and pollen record:
-  + **F9**: 60-m long, sampled for diatom, pollen and geochemistry
-  + **F7**: sampled for diatoms
-  + **M1**: sampled for diatoms and pollen
+### Three sediment cores, composite of 250 kyr diatom, geochemical and pollen record
++ **F9**: 60-m long, sampled for diatom, pollen and geochemistry
++ **F7**: sampled for diatoms
++ **M1**: sampled for diatoms and pollen
 
 
-## Load packages 
-```{r packages, include=FALSE}
+## Main numerical steps:
++ Clean data and estimate Principal Curves for each assemblage (pollen and diatoms)
++ Plot stratigraphical floristic changes over time to identify periods of change
++ Interpolate PrC from coarser to lower resolution 
++ GAM covariates model
++ HGAM-derivatives: assemblage-wide rate of change
+
+
+### Load packages 
+```{r packages, echo=TRUE, message=FALSE, warning=FALSE}
 library(analogue)
 library(tidyverse)
 library(vegan)
@@ -30,13 +38,10 @@ library(ggplot2)
 library(gratia)
 ```
 
-
-## Step 1: Estimate Principal Curves (PrC) of the diatom data
+## Step 1: Clean data and estimate Principal Curves (PrC) of the diatom cores (M1, F7 and F9)
 PrC is a nonlinear ordination technique that extracts a single gradient of variation from multivariate data.
 
-# Clean data
 ```{r principal curves diatoms, echo=TRUE, error=FALSE, message=FALSE, warning=FALSE}
-
 F_diatoms <- read.csv("data/Fuquene_diatoms_counts.csv") %>%
   rename(core=ï..core) #rename extraneous column name 
 
@@ -74,15 +79,20 @@ core_counts_common <- new %>%
   arrange(taxa)
 
 #make it wide
-core_counts_wide <- core_counts_common %>%
+core_counts_wide_diatoms <- core_counts_common %>%
   select(depth, upper_age, lower_age, taxa, relative_abundance_percent) %>%
-  spread(key = taxa, value = relative_abundance_percent) 
-
+  spread(key = taxa, value = relative_abundance_percent) %>%
+  arrange(upper_age) #sort by increasing time
 ```
 
-# Estime PrC and plot trends
+### Check temporal resolution of diatom record
+```{r}
+median(diff(core_counts_wide_diatoms$upper_age))
+plot.ts(diff(core_counts_wide_diatoms$upper_age))
+```
 
-```{r PrC, echo=FALSE, error=FALSE, message=FALSE, warning=FALSE}
+### Estime PrC and plot trends
+```{r PrC diatoms, echo=FALSE, error=FALSE, message=FALSE, warning=FALSE}
 ## extract agedepth variables
 agedepth <- core_counts_wide[,names(core_counts_wide) %in% c("depth", "upper_age", "lower_age")]
 diatoms <- core_counts_wide[,!(names(core_counts_wide) %in% c("upper_age", "lower_age", "depth"))]
@@ -110,10 +120,52 @@ diat_plt_prc
 
 ```
 
-## Step 2: Estimate Principal Curves (PrC) of the pollen data
-```{r pollen data, echo=FALSE, warning=FALSE}
+## Stratigraphic diatom plot
+
+### First do CONISS classification to see statistically significant stratigraphic zones
+```{r CONISS diatom, echo=FALSE, message=FALSE, warning=FALSE}
+library(rioja)
+
+#do coniss to add statistically significant stratigraphic zones
+core_counts_wide[is.na(core_counts_wide)] <- 0
+      
+diatHel <- decostand(core_counts_wide[,4:ncol(core_counts_wide)], method="hellinger")
+diss <- vegdist(diatHel, method="bray")
+clust <- chclust(diss, method="coniss")
+bstick(clust)
+
+#doesn't work
+zones <- cutree(clust, k=8)
+locate <- cumsum(rle(zones)$lengths)+1
+zones <- core_counts_wide_diatoms[locate, ][,2]
+zones <- zones$upper_age
+
+```
+
+```{r stratiplot, results='markup'}
+## Using tidypaleo R package (https://fishandwhistle.net/post/2018/stratigraphic-diagrams-with-tidypaleo-ggplot2/)
+library(tidypaleo) #remotes::install_github("paleolimbot/tidypaleo")
+library(patchwork)
+
+theme_set(theme_bw(9))
+
+# Plot  
+diat_plot <- ggplot(core_counts_common, aes(x = relative_abundance_percent, y = upper_age)) +
+  geom_col_segsh() +
+  scale_y_reverse() +
+  facet_abundanceh(vars(taxa)) +
+  labs(x = "Relative abundance (%)", y = "Cal yr BP") +
+  # add CONISS zones
+  geom_hline(yintercept = zones, col = "blue", lty = 1, alpha = 0.7) 
+diat_plot
+
+```
+
+## Clean data and Estimate Principal Curves (PrC) of the F9 pollen core
+```{r pollen data F9, echo=FALSE, warning=FALSE}
+#Read in F9 pollen record
 F_pollen <- read.csv("data/Fuquene_pollen_counts.csv") %>%
-  rename(depth=ï..depth) %>% #rename extraneous column name  
+  #rename(depth=ï..depth) %>% #rename extraneous column name  
   select(-c(contains("Lycopo") | contains("Tot.LocTot.100")))  
 
 names(F_pollen)
@@ -140,16 +192,31 @@ core_common_taxa <- pollen_long %>%
   pull(taxa)
 
 # select from initial table
-core_counts_common <- pollen_long %>%
+core_counts_common_F7 <- pollen_long %>%
   filter(taxa %in% core_common_taxa) %>%
   mutate(taxa = factor(taxa, levels = core_common_taxa)) %>%
   arrange(taxa)
 
 #make it wide
-core_counts_wide <- core_counts_common %>%
+core_counts_wide_F7 <- core_counts_common_F7 %>%
   select(depth, upper_age, lower_age, taxa, relative_abundance_percent) %>%
-  spread(key = taxa, value = relative_abundance_percent) 
+  spread(key = taxa, value = relative_abundance_percent) %>%
+  arrange(upper_age)
 
+# check age core ranges
+range(core_counts_wide_F7$upper_age)
+
+```
+
+### Check temporal resolution of pollen F7 record
+```{r}
+median(diff(core_counts_wide_F7$upper_age))
+plot.ts(diff(core_counts_wide_F7$upper_age))
+```
+
+### Plot PrC trends
+```{r}
+# remove agedepth columns for Hellinger transformation and bind back
 agedepth <- core_counts_wide[,names(core_counts_wide) %in% c("depth", "upper_age", "lower_age")]
 pollen <- core_counts_wide[,!(names(core_counts_wide) %in% c("upper_age", "lower_age", "depth"))]
 pollen[is.na(pollen)] <- 0 #Replace NA (if any) by 0
@@ -169,6 +236,95 @@ PollenPlot <- ggplot(PollenPrC, aes(x = upper_age, y = PrC)) +
   labs(y = "Pollen PrC", x = "Age (cal yr BP)", title = "") +
   ggtitle("Agropastoralism PrC")
 PollenPlot
+```
+
+
+## Clean data and Estimate Principal Curves (PrC) of the M1 pollen core
+```{r pollen data M1, echo=FALSE, warning=FALSE}
+M1_pollen_all <- read.csv("data/Fuquene_pollen_M1_counts.csv") %>%
+    select(-c(contains("Lycopo") | contains("Carbones") | contains("concentration") | contains("Suma.total") |
+                contains("Pollen.spores")))  
+
+# here drop out aquatic pollen and spores
+names(M1_pollen_all)
+drop <- c(85:105,106,107,108,109,111, 112, 114,115,117,119) #indexes where spores and aquatic pollen are
+
+M1_pollen <- M1_pollen_all %>% 
+  select(!all_of(drop)) %>% select(-c(contains("Huevo")))
+names(M1_pollen)
+
+# check ages ranges
+range(M1_pollen$upper_age)
+
+#this is to transform to tidy format, calculate % and subset more common species
+pollen_long <- M1_pollen %>% 
+  gather(key = taxa, value = count, -depth, -upper_age, -lower_age) %>%
+  #mutate(taxa = plyr::mapvalues(taxa, from = changes[,1], to = changes$new_2)) %>%
+  group_by(depth, taxa, upper_age, lower_age) %>%
+  summarise(count = sum(count)) %>%
+  filter(!count == "0" ) %>% #this is to remove empty samples (rows)
+  filter(!upper_age==0.0) %>% #this is to drop extraneous ages
+  ungroup() %>%
+  group_by(depth) %>%
+  mutate(relative_abundance_percent = count / sum(count) * 100) %>%
+  ungroup()
+
+# filter more abundant taxa; format need to be on long-wide format-->no spreaded 
+core_common_taxa <- pollen_long %>%
+  group_by(taxa) %>%
+  summarise(max_rel_abund = max(relative_abundance_percent)) %>%
+  filter(max_rel_abund >= 3) %>%
+  arrange(max_rel_abund) %>%
+  pull(taxa)
+
+# select from initial table
+core_counts_common_M1 <- pollen_long %>%
+  filter(taxa %in% core_common_taxa) %>%
+  mutate(taxa = factor(taxa, levels = core_common_taxa)) %>%
+  arrange(taxa)
+
+#make it wide
+core_counts_wide_M1 <- core_counts_common %>%
+  select(depth, upper_age, lower_age, taxa, relative_abundance_percent) %>%
+  spread(key = taxa, value = relative_abundance_percent) 
 
 ```
+
+## Join M1 and F7 records by common taxa names (columns)
+```{r join pollen records, echo=FALSE, message=FALSE, warning=FALSE}
+#combine cores (join's analogue package function)
+df <- analogue::join(core_counts_wide_M1, core_counts_wide_F7, verbose = TRUE)
+
+#check NA in the list and name the list
+listnans <- lapply(df, function(x) sum(is.na(x)))
+names(cores) <- c("M1", "F7")
+
+# extract merged cores and sort by age
+merged <- plyr::ldply(df, data.frame)
+merged <- merged[,-1] #remove .id variable
+
+pollen_M1_F7 <- merged[order(merged$upper_age),] #arrange in increasing age
+
+```
+
+## Stratigraphic plot pollen cores M1 and F7
+```{r}
+# Gather dataset
+pollen_long_M1_F7 <- pollen_M1_F7 %>% 
+  gather(key = taxa, value = relative_abundance_percent, -depth, -upper_age, -lower_age) 
+
+# Plot  
+pollen_plot <- ggplot(pollen_long_M1_F7, aes(x = relative_abundance_percent, y = upper_age)) +
+  geom_col_segsh() +
+  scale_y_reverse() +
+  facet_abundanceh(vars(taxa)) +
+  labs(x = "Relative abundance (%)", y = "Cal yr BP")
+  # add CONISS zones
+  #geom_hline(yintercept = zones, col = "blue", lty = 1, alpha = 0.7) 
+pollen_plot
+```
+
+
+
+
 
