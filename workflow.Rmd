@@ -62,7 +62,10 @@ new <- diatoms_save %>%
   ungroup() %>%
   group_by(depth) %>%
   mutate(relative_abundance_percent = count / sum(count) * 100) %>%
-  ungroup()
+  mutate(elapsedTime = abs(upper_age - lower_age)) %>%
+  mutate(negAge=-upper_age) %>%
+  ungroup() 
+
 
 # filter more abundant taxa; format need to be on long-wide format-->no spreaded 
 core_common_taxa <- new %>%
@@ -94,8 +97,8 @@ plot.ts(diff(core_counts_wide_diatoms$upper_age))
 ### Estime PrC and plot trends
 ```{r PrC diatoms, echo=FALSE, error=FALSE, message=FALSE, warning=FALSE}
 ## extract agedepth variables
-agedepth <- core_counts_wide[,names(core_counts_wide) %in% c("depth", "upper_age", "lower_age")]
-diatoms <- core_counts_wide[,!(names(core_counts_wide) %in% c("upper_age", "lower_age", "depth"))]
+agedepth <- core_counts_wide_diatoms[,names(core_counts_wide_diatoms) %in% c("depth", "upper_age", "lower_age")]
+diatoms <- core_counts_wide_diatoms[,!(names(core_counts_wide_diatoms) %in% c("upper_age", "lower_age", "depth"))]
 
 # Transform data to Hellinger form
 diatoms[is.na(diatoms)] <- 0 #Replace NA (if any) by 0
@@ -166,7 +169,8 @@ diat_plot
 #Read in F9 pollen record
 F_pollen <- read.csv("data/Fuquene_pollen_counts.csv") %>%
   #rename(depth=ï..depth) %>% #rename extraneous column name  
-  select(-c(contains("Lycopo") | contains("Tot.LocTot.100")))  
+  select(-c(contains("Lycopo") | contains("Tot.LocTot.100"))) %>%
+  rename(depth=ï..depth)
 
 names(F_pollen)
 
@@ -192,33 +196,33 @@ core_common_taxa <- pollen_long %>%
   pull(taxa)
 
 # select from initial table
-core_counts_common_F7 <- pollen_long %>%
+core_counts_common_F9 <- pollen_long %>%
   filter(taxa %in% core_common_taxa) %>%
   mutate(taxa = factor(taxa, levels = core_common_taxa)) %>%
   arrange(taxa)
 
 #make it wide
-core_counts_wide_F7 <- core_counts_common_F7 %>%
+core_counts_wide_F9 <- core_counts_common_F9 %>%
   select(depth, upper_age, lower_age, taxa, relative_abundance_percent) %>%
   spread(key = taxa, value = relative_abundance_percent) %>%
   arrange(upper_age)
 
 # check age core ranges
-range(core_counts_wide_F7$upper_age)
+range(core_counts_wide_F9$upper_age)
 
 ```
 
 ### Check temporal resolution of pollen F7 record
 ```{r}
-median(diff(core_counts_wide_F7$upper_age))
-plot.ts(diff(core_counts_wide_F7$upper_age))
+median(diff(core_counts_wide_F9$upper_age))
+plot.ts(diff(core_counts_wide_F9$upper_age))
 ```
 
 ### Plot PrC trends
 ```{r}
 # remove agedepth columns for Hellinger transformation and bind back
-agedepth <- core_counts_wide[,names(core_counts_wide) %in% c("depth", "upper_age", "lower_age")]
-pollen <- core_counts_wide[,!(names(core_counts_wide) %in% c("upper_age", "lower_age", "depth"))]
+agedepth <- core_counts_wide_F9[,names(core_counts_wide_F9) %in% c("depth", "upper_age", "lower_age")]
+pollen <- core_counts_wide_F9[,!(names(core_counts_wide_F9) %in% c("upper_age", "lower_age", "depth"))]
 pollen[is.na(pollen)] <- 0 #Replace NA (if any) by 0
 
 # Transform data to Hellinger form
@@ -234,7 +238,7 @@ PollenPrC <- cbind(agedepth, scrs_prc)
 PollenPlot <- ggplot(PollenPrC, aes(x = upper_age, y = PrC)) +
   geom_line() + geom_point() +
   labs(y = "Pollen PrC", x = "Age (cal yr BP)", title = "") +
-  ggtitle("Agropastoralism PrC")
+  ggtitle("Pollen PrC")
 PollenPlot
 ```
 
@@ -243,7 +247,9 @@ PollenPlot
 ```{r pollen data M1, echo=FALSE, warning=FALSE}
 M1_pollen_all <- read.csv("data/Fuquene_pollen_M1_counts.csv") %>%
     select(-c(contains("Lycopo") | contains("Carbones") | contains("concentration") | contains("Suma.total") |
-                contains("Pollen.spores")))  
+                contains("Pollen.spores"))) %>%
+    rename(depth=ï..depth) #rename extraneous column name 
+
 
 # here drop out aquatic pollen and spores
 names(M1_pollen_all)
@@ -273,7 +279,7 @@ pollen_long <- M1_pollen %>%
 core_common_taxa <- pollen_long %>%
   group_by(taxa) %>%
   summarise(max_rel_abund = max(relative_abundance_percent)) %>%
-  filter(max_rel_abund >= 3) %>%
+  filter(max_rel_abund >= 5) %>%
   arrange(max_rel_abund) %>%
   pull(taxa)
 
@@ -284,7 +290,7 @@ core_counts_common_M1 <- pollen_long %>%
   arrange(taxa)
 
 #make it wide
-core_counts_wide_M1 <- core_counts_common %>%
+core_counts_wide_M1 <- core_counts_common_M1 %>%
   select(depth, upper_age, lower_age, taxa, relative_abundance_percent) %>%
   spread(key = taxa, value = relative_abundance_percent) 
 
@@ -293,28 +299,29 @@ core_counts_wide_M1 <- core_counts_common %>%
 ## Join M1 and F7 records by common taxa names (columns)
 ```{r join pollen records, echo=FALSE, message=FALSE, warning=FALSE}
 #combine cores (join's analogue package function)
-df <- analogue::join(core_counts_wide_M1, core_counts_wide_F7, verbose = TRUE)
+df <- analogue::join(core_counts_wide_M1, core_counts_wide_F9, verbose = TRUE)
 
 #check NA in the list and name the list
 listnans <- lapply(df, function(x) sum(is.na(x)))
-names(cores) <- c("M1", "F7")
+names(df) <- c("M1", "F7")
 
 # extract merged cores and sort by age
 merged <- plyr::ldply(df, data.frame)
-merged <- merged[,-1] #remove .id variable
+# merged <- merged[,-1] #remove .id variable
 
-pollen_M1_F7 <- merged[order(merged$upper_age),] #arrange in increasing age
+pollen_M1_F9 <- merged[order(merged$upper_age),] %>% #arrange in increasing age
+                  rename(core=.id)
 
 ```
 
 ## Stratigraphic plot pollen cores M1 and F7
 ```{r}
 # Gather dataset
-pollen_long_M1_F7 <- pollen_M1_F7 %>% 
-  gather(key = taxa, value = relative_abundance_percent, -depth, -upper_age, -lower_age) 
+pollen_long_M1_F9 <- pollen_M1_F9 %>% 
+  gather(key = taxa, value = relative_abundance_percent, -depth, -upper_age, -lower_age, -core) 
 
 # Plot  
-pollen_plot <- ggplot(pollen_long_M1_F7, aes(x = relative_abundance_percent, y = upper_age)) +
+pollen_plot <- ggplot(pollen_long_M1_F9, aes(x = relative_abundance_percent, y = upper_age)) +
   geom_col_segsh() +
   scale_y_reverse() +
   facet_abundanceh(vars(taxa)) +
@@ -324,7 +331,194 @@ pollen_plot <- ggplot(pollen_long_M1_F7, aes(x = relative_abundance_percent, y =
 pollen_plot
 ```
 
+## Geochemical and gran size datasets
 
+```{r}
+#Read in geochemistry 
+F9_geochem <- read.csv("data/Fuquene_F9_geochem.csv") %>%
+  rename(depth=ï..depth) %>%
+  rename(TIC_percent=X..TIC) %>%
+  rename(N_percent=wt..N) %>%
+  rename(C_percent=wt..C) %>%
+  rename(TOC_percent=wt..TOC) %>%
+  rename(TC_TN=TC.TN) %>%
+  rename(d13C=d13C..permil..vs.VPDB.)
+
+names(F9_geochem)
+ 
+#check median temporal resolution
+median(diff(F9_geochem$upper_age))
+plot.ts(diff(F9_geochem$upper_age))
+
+#Read in grain size 
+F9_grainsize <- read.csv("data/Fuquene_F9_grainsize.csv") %>%
+  rename(depth=depth..cm.) %>%
+  rename(upper_age=ï..upper_age)
+
+#check median temporal resolution
+median(diff(F9_grainsize$upper_age))
+plot.ts(diff(F9_grainsize$upper_age))
+
+```
+
+```{r}
+### Interpolation to the coarser dataset: geochemistry
+
+LOI375_i <- as.data.frame(approx(F9_grainsize$upper_age, F9_grainsize$LOI.375, F9_geochem$upper_age)$y)
+LOI375_i$age <- F9_geochem$upper_age
+colnames(LOI375_i) <- c("LOI375", "age")
+
+LOI375_i$sand <- approx(F9_grainsize$upper_age, F9_grainsize$EM1, F9_geochem$upper_age)$y
+LOI375_i$coarsesilt <- approx(F9_grainsize$upper_age, F9_grainsize$EM2, F9_geochem$upper_age)$y
+LOI375_i$finesilt <- approx(F9_grainsize$upper_age, F9_grainsize$EM3, F9_geochem$upper_age)$y
+LOI375_i$clay <- approx(F9_grainsize$upper_age, F9_grainsize$EM4, F9_geochem$upper_age)$y
+
+F9_geochem_grainsize_i <- LOI375_i
+
+head(F9_geochem_grainsize_i)
+diff(F9_geochem_grainsize_i$age)
+
+#plot(diatom_to_pollen_prc_i[,1], diatom_to_pollen_prc_i[,3])
+```
+
+
+## Hierarchical Generalized Additive Models (HGAM) -- **Synchronous model**
+In this step we model, first, diatom and pollen assemblages using HGAM and then calculate average rate of change at assemblage-level to assess the timing in the start of rapid change in the time-series, and test comparable rates of change between aquatic and terrestrial ecosystems.
+
+By obtaining derivative-based values of the diatom, terrestrial pollen, and agropastoralism time series we obtain regular time intervals at XX-year resolution (median between diatom and pollen records) and hence comparable--same time steps-- for fitting the synchronous and asynchronous models. 
+
+We fit model I HGAM (Pedersen et al., 2019): group-level smoothness between groups (spp) without a global smooth while allowing different willingness to not assume any shape among species for each assemblage.
+
+### Diatom assemblages
+This chunk is reproducible for 
+
+```{r}
+
+#Prepare the data
+agedepth <- F_diatoms[, names(F_diatoms) %in% c("depth", "upper_age", "lower_age", "core")] 
+diat <- F_diatoms[, !names(F_diatoms) %in% c("depth", "upper_age", "lower_age", "core")]
+diat[is.na(diat)] <- 0
+agedepth$elapsed <- round(abs(agedepth$upper_age - agedepth$lower_age),0)
+
+#Select most common species 
+criteria <- 0.2 #% of the total samples
+
+n.occur <- apply(diat>0, 2, sum)
+diat_red <- diat[, n.occur > (dim(diat)[1])*criteria] #
+diatoms <- cbind(agedepth, diat_red)
+
+#this is to transform to tidy format, calculate % and subset more common species
+diat_data <- diatoms %>% 
+  gather(key = taxa, value = count, -depth, -upper_age, -lower_age, -core) %>%
+  #mutate(taxa = plyr::mapvalues(taxa, from = changes[,1], to = changes$new_2)) %>%
+  group_by(depth) %>%
+  mutate(total_sample = sum(count)) %>% 
+  filter(!total_sample == "0") %>% #this is to remove empty samples
+  mutate(log_total_counts = log10(total_sample+1)) %>%
+  mutate(relative_abundance_percent = count / sum(count) * 100) %>%
+  mutate(negAge = -upper_age) %>%
+  #mutate(AgeCE = upper_age*(-1)+1950) %>%
+  #filter(AgeCE >= "0") %>%
+  mutate(elapsedTime = round(abs(upper_age - lower_age),0)) %>%
+  ungroup() %>%
+  filter(!is.na(elapsedTime)) %>%
+  mutate(spp = factor(taxa)) 
+
+levels(diat_data$spp)
+
+#model S HGAM : similar smootheness between groups (spp) without global smooth 
+set.seed(10) #set a seed so this is repeatable
+diatom_gam_S <- gam(count ~ s(negAge, spp, k=20, bs="fs") + offset(log_total_counts),
+                    weights = elapsedTime/mean(elapsedTime),
+                    data=diat_data, family = nb, #places notes at the deciles of sample ages
+                    method = "REML")
+
+summary(diatom_gam_S)
+gam.check(diatom_gam_S)
+draw(diatom_gam_S)
+
+#model I HGAM: different smootheness for each taxa without global smooth
+diatom_gam_I<- gam(count ~ s(negAge, by=spp, k=20, bs="fs") +
+                     s(spp, bs="re") + offset(log_total_counts),
+                   weights = elapsedTime/mean(elapsedTime),
+                   data=diat_data, family = nb, #places notes at the deciles of sample ages
+                   method = "REML")
+
+gam.check(diatom_gam_I)
+draw(diatom_gam_I)
+
+#Compare different model fits using AIC
+AIC_table <- AIC(diatom_gam_S, diatom_gam_I)%>%
+  rownames_to_column(var= "Model")%>%
+  mutate(data_source = rep(c("diatom_data")))%>%
+  group_by(data_source)%>%
+  mutate(deltaAIC = AIC - min(AIC))%>%
+  ungroup()%>%
+  dplyr::select(-data_source)%>%
+  mutate_at(.vars = vars(df,AIC, deltaAIC), 
+            .funs = funs(round,.args = list(digits=0)))
+
+#Create synthetic data to predict over a range of ages
+diat_plot_data <- with(diat_data, as_tibble(expand.grid(negAge = seq(min(diat_data$negAge), max(diat_data$negAge)),
+                                                        spp = factor(levels(diat_data$spp)),
+                                                        log_total_counts = mean(log_total_counts))))
+
+diat_modS_fit <- predict(diatom_gam_S, 
+                         newdata = diat_plot_data,
+                         se.fit = TRUE)
+
+diat_modI_fit <- predict(diatom_gam_I,
+                         newdata = diat_plot_data,
+                         se.fit = TRUE)
+
+#non-shared trends
+diat_plot_data$modS_fit <- as.numeric(diat_modS_fit$fit)
+diat_plot_data$modI_fit <- as.numeric(diat_modI_fit$fit)
+
+# comparing non-shared trends
+diat_plot_data <- gather(diat_plot_data, key=model, value=fit, modS_fit, modI_fit)
+
+diat_plot_data <- mutate(diat_plot_data, se= c(as.numeric(diat_modS_fit$se.fit),
+                                               as.numeric(diat_modI_fit$se.fit)),
+                         upper = exp(fit + (2 * se)),
+                         lower = exp(fit - (2 * se)),
+                         fit   = exp(fit))
+
+# For only one model
+# diat_plot_data <- gather(diat_plot_data, key=model, value=fit, modI_fit)
+# diat_plot_data <- mutate(diat_plot_data, se= c(as.numeric(diat_modI_fit$se.fit)),
+#                          upper = exp(fit + (2 * se)),
+#                          lower = exp(fit - (2 * se)),
+#                          fit   = exp(fit))
+
+#Plot the model output for non-shared trends, with means plus standard deviations for each model.
+diat_plot_model_labels <- paste("Model", c("S", "I"))
+diat_plot_model_labels <- factor(diat_plot_model_labels, levels = diat_plot_model_labels)
+
+#non-shared trends
+theme_set(theme_bw())
+theme_update(panel.grid = element_blank())
+
+diat_plot <- ggplot(diat_plot_data) +
+  facet_wrap(~spp, nrow = 4,scales = "free_y")+
+  geom_ribbon(aes(x=negAge,
+                  ymin = lower,
+                  ymax = upper,
+                  fill = model),
+              alpha=0.2)+
+  geom_point(data= diat_data, aes(x = negAge, y = count), size=0.06) +
+  geom_line(aes(x = negAge, y = fit, color = model))+
+  labs(y = "Absolute counts", x = "Age (cal yr BP)") +
+  scale_fill_brewer(name = "", palette = "Dark2",
+                    labels = diat_plot_model_labels) +
+  scale_colour_brewer(name = "",
+                      palette = "Dark2", labels = diat_plot_model_labels)+
+  theme(legend.position = "top",
+        strip.text = element_text(size=10))
+
+diat_plot
+
+```
 
 
 
