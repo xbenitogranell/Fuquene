@@ -170,6 +170,7 @@ diat_plot
 F_pollen <- read.csv("data/Fuquene_pollen_counts.csv") %>%
   #rename(depth=ï..depth) %>% #rename extraneous column name  
   select(-c(contains("Lycopo") | contains("Tot.LocTot.100"))) %>%
+  select(-c(66,67,68,70)) %>% 
   rename(depth=ï..depth)
 
 names(F_pollen)
@@ -212,9 +213,9 @@ range(core_counts_wide_F9$upper_age)
 
 ```
 
-### Check temporal resolution of pollen F7 record
+### Check temporal resolution of pollen F9 record
 ```{r}
-median(diff(core_counts_wide_F9$upper_age))
+mean(diff(core_counts_wide_F9$upper_age))
 plot.ts(diff(core_counts_wide_F9$upper_age))
 ```
 
@@ -251,9 +252,9 @@ M1_pollen_all <- read.csv("data/Fuquene_pollen_M1_counts.csv") %>%
     rename(depth=ï..depth) #rename extraneous column name 
 
 
-# here drop out aquatic pollen and spores
+# here drop out algae and spores
 names(M1_pollen_all)
-drop <- c(85:105,106,107,108,109,111, 112, 114,115,117,119) #indexes where spores and aquatic pollen are
+drop <- c(85:119) #indexes where spores and algae are
 
 M1_pollen <- M1_pollen_all %>% 
   select(!all_of(drop)) %>% select(-c(contains("Huevo")))
@@ -297,6 +298,7 @@ core_counts_wide_M1 <- core_counts_common_M1 %>%
 ```
 
 ## Join M1 and F7 records by common taxa names (columns)
+
 ```{r join pollen records, echo=FALSE, message=FALSE, warning=FALSE}
 #combine cores (join's analogue package function)
 df <- analogue::join(core_counts_wide_M1, core_counts_wide_F9, verbose = TRUE)
@@ -387,7 +389,7 @@ In this step we model, first, diatom and pollen assemblages using HGAM and then 
 
 By obtaining derivative-based values of the diatom, terrestrial pollen, and agropastoralism time series we obtain regular time intervals at XX-year resolution (median between diatom and pollen records) and hence comparable--same time steps-- for fitting the synchronous and asynchronous models. 
 
-We fit model I HGAM (Pedersen et al., 2019): group-level smoothness between groups (spp) without a global smooth while allowing different willingness to not assume any shape among species for each assemblage.
+We fit model S HGAM (Pedersen et al., 2019): group-level smoothness between groups (spp) without a global smooth while allowing different willingness to not assume any shape among species for each assemblage.
 
 ### Diatom assemblages
 This chunk is reproducible for 
@@ -518,7 +520,122 @@ diat_plot <- ggplot(diat_plot_data) +
 
 diat_plot
 
+## save model results for later use
+write.csv(diat_plot_data, "outputs/diatoms-HGAMs-fitted-values.csv", row.names = FALSE)
+
 ```
 
+
+##Derivatives and posterior distribution simulation
+
+```{r}
+# Eric's code
+#Function for calculating first derivatives of time series given a before,
+#after, and delta step size
+calc_1st_deriv = function(fit_before, fit_after,delta) {
+  (fit_after-fit_before)/(2*delta)
+}
+
+set.seed(10) #set a seed so this is repeatable
+n_sims = 250
+
+n_length = 240
+
+years <- seq(min(diat_plot_data$negAge),
+             max(diat_plot_data$negAge),
+             length.out = n_length)
+
+diff(years)
+#model <- diatom_gam_S
+
+model <- diatom_gam_I
+
+#pred <- diat_modS_fit
+pred <- diat_modI_fit
+
+# Generate multivariate normal simulations of model coefficients
+random_coefs <- t(rmvn(n_sims, mu = coef(model),V = vcov(model)))
+
+confint_sims <- crossing(spp=unique(diat_plot_data$spp),
+                         negAge = seq(min(diat_plot_data$negAge),
+                                      max(diat_plot_data$negAge),
+                                      length.out = n_length),
+                         log_total_counts=0)
+
+map_pred_sims <- predict(model,
+                         confint_sims,
+                         type = "lpmatrix") %*% random_coefs %>%
+  as_data_frame() %>%
+  bind_cols(confint_sims)%>%
+  gather(key = simulation, value = pred, -negAge, -log_total_counts,-spp)
+
+
+#specifying the step size for numerical derivative calculations
+delta = 0.01
+
+#calculating the predicted value for the current year plus delta
+step_ahead_fits = confint_sims %>%
+  mutate(negAge = negAge+delta)%>%
+  predict(model, 
+          ., type = "lpmatrix") %*% random_coefs 
+
+
+#calculating the predicted value for the current year minus delta
+step_behind_fits = confint_sims %>%
+  mutate(negAge = negAge-delta)%>%
+  predict(model,
+          ., type = "lpmatrix") %*% random_coefs 
+
+
+#using the predicted values for year plus and minus delta to calculate
+#derivatives for each species for each simulation
+derivs <- calc_1st_deriv(step_behind_fits,step_ahead_fits,delta = delta)%>%
+  as_data_frame()%>%
+  bind_cols(confint_sims)%>%
+  gather(key = simulation,value = deriv, -spp,-negAge, -log_total_counts)
+
+#Creating summaries of derivatives for each simulation for each year
+deriv_summaries <- derivs %>%
+  group_by(negAge,simulation)%>%
+  summarize(deriv_mean = mean(deriv),
+            deriv_sd = sd(deriv))%>%
+  group_by(negAge)%>% #turning derivative summaries into 95% confidence intervals
+  select(-simulation)%>%
+  summarize_all(.funs = list(lower = ~quantile(.,probs = 0.025),
+                             upper = ~quantile(.,probs = 0.975),
+                             med   = ~quantile(.,probs = 0.5)))
+
+#Plotting mean rate of change plus the 95% CI
+mean_plot <- deriv_summaries %>%
+  ggplot(aes(x = negAge, 
+             y = deriv_mean_med, 
+             ymin = deriv_mean_lower,
+             ymax = deriv_mean_upper))+
+  geom_ribbon(fill="grey")+
+  geom_line()+
+  geom_hline(yintercept = 0, linetype=2) +
+  scale_y_continuous("")+
+  xlab("Cal years BP") +
+  theme_bw()
+mean_plot 
+
+#Plotting standard deviation of rate of change plus the 95% CI
+sd_plot <- deriv_summaries %>%
+  ggplot(aes(x = negAge, 
+             y = deriv_sd_med, 
+             ymin=deriv_sd_lower,
+             ymax=deriv_sd_upper))+
+  geom_ribbon(fill="grey")+
+  geom_line()+
+  geom_hline(yintercept = 0, linetype=2) +
+  scale_y_continuous("")+
+  xlab("Cal years BP") +
+  theme_bw()
+sd_plot
+
+
+## save derivative summaries for later use
+write.csv(deriv_summaries, "outputs/diatom-derivatives.csv", row.names = FALSE)
+```
 
 
