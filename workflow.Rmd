@@ -202,10 +202,16 @@ core_counts_common_F9 <- pollen_long %>%
   mutate(taxa = factor(taxa, levels = core_common_taxa)) %>%
   arrange(taxa)
 
-#make it wide
+#make it wide--relative abundance
 core_counts_wide_F9 <- core_counts_common_F9 %>%
   select(depth, upper_age, lower_age, taxa, relative_abundance_percent) %>%
   spread(key = taxa, value = relative_abundance_percent) %>%
+  arrange(upper_age)
+
+#make it wide--counts
+core_counts_wide_F9 <- core_counts_common_F9 %>%
+  select(depth, upper_age, lower_age, taxa, count) %>%
+  spread(key = taxa, value = count) %>%
   arrange(upper_age)
 
 # check age core ranges
@@ -290,10 +296,15 @@ core_counts_common_M1 <- pollen_long %>%
   mutate(taxa = factor(taxa, levels = core_common_taxa)) %>%
   arrange(taxa)
 
-#make it wide
+#make it wide--relative abundance
 core_counts_wide_M1 <- core_counts_common_M1 %>%
   select(depth, upper_age, lower_age, taxa, relative_abundance_percent) %>%
   spread(key = taxa, value = relative_abundance_percent) 
+
+#make it wide--counts
+core_counts_wide_M1 <- core_counts_common_M1 %>%
+  select(depth, upper_age, lower_age, taxa, count) %>%
+  spread(key = taxa, value = count) 
 
 ```
 
@@ -314,6 +325,8 @@ merged <- plyr::ldply(df, data.frame)
 pollen_M1_F9 <- merged[order(merged$upper_age),] %>% #arrange in increasing age
                   rename(core=.id)
 
+# write results
+write.csv(pollen_M1_F9, "outputs/pollen_M1_F9_counts.csv")
 ```
 
 ## Stratigraphic plot pollen cores M1 and F7
@@ -333,8 +346,36 @@ pollen_plot <- ggplot(pollen_long_M1_F9, aes(x = relative_abundance_percent, y =
 pollen_plot
 ```
 
-## Geochemical and gran size datasets
+## Composite pollen M1 & M9 cores (>%5 relative abundance & counts)
+```{r}
+## Read in change nms table
+nms_pollen <- read.csv("data/nms_changes_pollenM1M9.csv", sep = ";")
+head(nms_pollen)
 
+## Change pollen names and groups
+pollen_M1_F9 <- read.csv("outputs/pollen_M1_F9_ra.csv")[-1] %>% #remove column core
+  gather(key = taxa, value = prop, -depth, -upper_age, -lower_age, -core) %>%
+  mutate(taxa = plyr::mapvalues(taxa, from = nms_pollen[,1], to = nms_pollen$new)) %>%
+  mutate(group = plyr::mapvalues(taxa, from = nms_pollen[,2], to = nms_pollen$habitat)) %>%
+  group_by(depth, upper_age, lower_age) %>%
+  mutate(sqrt_pc = sqrt(prop)) %>%
+  mutate(Norm_sqrt_pc=sqrt_pc/sum(sqrt_pc)*100) %>%
+  ungroup() %>%
+  select(-sqrt_pc) 
+
+## Plot the data
+theme_set(theme_bw(base_size=16))
+ggplot(pollen_M1_M9, aes(y=upper_age, x=Norm_sqrt_pc)) +
+  geom_line(orientation="y") +
+  facet_grid(. ~ group, scales="free_x", space="free_x") +
+  scale_x_continuous(breaks=seq(0, 100, by=20)) +
+  scale_y_reverse(breaks=seq(0, 284000, by=1000)) +
+  labs(x="%", y="Years BP")
+
+```
+
+
+## Geochemical and gran size datasets
 ```{r}
 #Read in geochemistry 
 F9_geochem <- read.csv("data/Fuquene_F9_geochem.csv") %>%
@@ -378,9 +419,20 @@ LOI375_i$clay <- approx(F9_grainsize$upper_age, F9_grainsize$EM4, F9_geochem$upp
 F9_geochem_grainsize_i <- LOI375_i
 
 head(F9_geochem_grainsize_i)
-diff(F9_geochem_grainsize_i$age)
+median(diff(F9_geochem_grainsize_i$age))
 
-#plot(diatom_to_pollen_prc_i[,1], diatom_to_pollen_prc_i[,3])
+# test some temporal variations
+plot.ts(F9_geochem_grainsize_i$age, F9_geochem_grainsize_i[,3])
+
+# Cbind the two dataframes
+F9_geochem_grainsize_int <- cbind(F9_geochem[,c(1,3:ncol(F9_geochem))], F9_geochem_grainsize_i)
+
+# reorder columns and change upper age name
+F9_geochem_grainsize_i <- F9_geochem_grainsize_int[,c(1,10,2,3,4,5,6,7,8,9,11,12,13,14)]
+colnames(F9_geochem_grainsize_i)[2] <- "upper_age"
+
+# Save the dataset
+write.csv(F9_geochem_grainsize_i, "outputs/F9_geochem_grainsize_i.csv")
 ```
 
 
@@ -392,10 +444,9 @@ By obtaining derivative-based values of the diatom, terrestrial pollen, and agro
 We fit model S HGAM (Pedersen et al., 2019): group-level smoothness between groups (spp) without a global smooth while allowing different willingness to not assume any shape among species for each assemblage.
 
 ### Diatom assemblages
-This chunk is reproducible for 
+This chunk is reproducible for pollen
 
-```{r}
-
+```{r HGAM diatoms}
 #Prepare the data
 agedepth <- F_diatoms[, names(F_diatoms) %in% c("depth", "upper_age", "lower_age", "core")] 
 diat <- F_diatoms[, !names(F_diatoms) %in% c("depth", "upper_age", "lower_age", "core")]
@@ -525,10 +576,8 @@ write.csv(diat_plot_data, "outputs/diatoms-HGAMs-fitted-values.csv", row.names =
 
 ```
 
-
 ##Derivatives and posterior distribution simulation
-
-```{r}
+```{r diatom derivatives}
 # Eric's code
 #Function for calculating first derivatives of time series given a before,
 #after, and delta step size
@@ -636,6 +685,772 @@ sd_plot
 
 ## save derivative summaries for later use
 write.csv(deriv_summaries, "outputs/diatom-derivatives.csv", row.names = FALSE)
+```
+
+### Pollen HGAM
+```{r HGAM pollen}
+## Read in change nms table
+nms_pollen <- read.csv("data/nms_changes_pollenM1M9.csv", sep = ";")
+head(nms_pollen)
+
+## Change pollen names and groups
+pollen_longdata <- read.csv("outputs/pollen_M1_F9_counts.csv")[-1] %>% #remove column core
+  gather(key = taxa, value = count, -depth, -upper_age, -lower_age, -core) %>%
+  mutate(taxa = plyr::mapvalues(taxa, from = nms_pollen[,1], to = nms_pollen$new)) %>%
+  #mutate(group = plyr::mapvalues(taxa, from = nms_pollen[,2], to = nms_pollen$habitat)) %>%
+  group_by(depth) %>%
+  mutate(total_sample = sum(count)) %>% 
+  filter(!total_sample == "0") %>% #this is to remove empty samples
+  mutate(log_total_counts = log10(total_sample+1)) %>%
+  mutate(relative_abundance_percent = count / sum(count) * 100) %>%
+  mutate(negAge = -upper_age) %>%
+  #mutate(AgeCE = upper_age*(-1)+1950) %>%
+  #filter(AgeCE >= "0") %>%
+  mutate(elapsedTime = round(abs(upper_age - lower_age),0)) %>%
+  ungroup() %>%
+  group_by(depth, taxa) %>%
+  filter(relative_abundance_percent > 10) %>%
+  filter(!is.na(elapsedTime)) %>%
+  mutate(spp = factor(taxa)) %>%
+  ungroup() 
+
+levels(pollen_longdata$spp)
+
+#model S HGAM : similar smootheness between groups (spp) without global smooth 
+set.seed(10) #set a seed so this is repeatable
+pollen_gam_S <- gam(count ~ s(negAge, spp, k=20, bs="fs") + offset(log_total_counts),
+                    weights = elapsedTime/mean(elapsedTime),
+                    data=pollen_longdata, family = nb, #places notes at the deciles of sample ages
+                    method = "REML")
+
+summary(pollen_gam_S)
+gam.check(pollen_gam_S)
+draw(pollen_gam_S)
+
+#model I HGAM: different smootheness for each taxa without global smooth
+pollen_gam_I<- gam(count ~ s(negAge, by=spp, k=20, bs="fs") +
+                     s(spp, bs="re") + offset(log_total_counts),
+                   weights = elapsedTime/mean(elapsedTime),
+                   data=pollen_longdata, family = nb, #places notes at the deciles of sample ages
+                   method = "REML")
+
+gam.check(pollen_gam_I)
+draw(pollen_gam_I)
+
+#Compare different model fits using AIC
+AIC_table <- AIC(pollen_gam_S, pollen_gam_I)%>%
+  rownames_to_column(var= "Model")%>%
+  mutate(data_source = rep(c("diatom_data")))%>%
+  group_by(data_source)%>%
+  mutate(deltaAIC = AIC - min(AIC))%>%
+  ungroup()%>%
+  dplyr::select(-data_source)%>%
+  mutate_at(.vars = vars(df,AIC, deltaAIC), 
+            .funs = funs(round,.args = list(digits=0)))
+
+AIC_table
+
+## Here the synthetic data to predict should be over the range of diatom ages to get the same ages for the synchronous/asynchronous model
+
+#Create synthetic data to predict over a range of ages: here match with diatom samples
+pollen_plot_data <- with(pollen_longdata, as_tibble(expand.grid(negAge = seq(min(diat_data$negAge), max(diat_data$negAge)),
+                                                        spp = factor(levels(pollen_longdata$spp)),
+                                                        log_total_counts = mean(log_total_counts))))
+
+
+pollen_modS_fit <- predict(pollen_gam_S, 
+                         newdata = pollen_plot_data,
+                         se.fit = TRUE)
+
+pollen_modI_fit <- predict(pollen_gam_I,
+                         newdata = pollen_plot_data,
+                         se.fit = TRUE)
+
+#non-shared trends
+pollen_plot_data$modS_fit <- as.numeric(pollen_modS_fit$fit)
+pollen_plot_data$modI_fit <- as.numeric(pollen_modI_fit$fit)
+
+# comparing non-shared trends
+pollen_plot_data <- gather(pollen_plot_data, key=model, value=fit, modS_fit, modI_fit)
+
+pollen_plot_data <- mutate(pollen_plot_data, se= c(as.numeric(pollen_modS_fit$se.fit),
+                                               as.numeric(pollen_modI_fit$se.fit)),
+                         upper = exp(fit + (2 * se)),
+                         lower = exp(fit - (2 * se)),
+                         fit   = exp(fit))
+
+
+#Plot the model output for non-shared trends, with means plus standard deviations for each model.
+pollen_plot_model_labels <- paste("Model", c("S", "I"))
+pollen_plot_model_labels <- factor(pollen_plot_model_labels, levels = pollen_plot_model_labels)
+
+#non-shared trends
+theme_set(theme_bw())
+theme_update(panel.grid = element_blank())
+
+pollen_plot <- ggplot(pollen_plot_data) +
+  facet_wrap(~spp, nrow = 4,scales = "free_y")+
+  geom_ribbon(aes(x=negAge,
+                  ymin = lower,
+                  ymax = upper,
+                  fill = model),
+              alpha=0.2)+
+  geom_point(data= pollen_longdata, aes(x = negAge, y = count), size=0.06) +
+  geom_line(aes(x = negAge, y = fit, color = model))+
+  labs(y = "Absolute counts", x = "Age (cal yr BP)") +
+  scale_fill_brewer(name = "", palette = "Dark2",
+                    labels = pollen_plot_model_labels) +
+  scale_colour_brewer(name = "",
+                      palette = "Dark2", labels = pollen_plot_model_labels)+
+  theme(legend.position = "top",
+        strip.text = element_text(size=10))
+
+pollen_plot
+
+ggsave("outputs/pollen_plot.png",
+       plot = pollen_plot ,
+       width = 10,
+       height=8,
+       units="in",
+       dpi = 300)
+
+
+## save model results for later use
+write.csv(pollen_plot_data, "outputs/pollen-HGAMs-fitted-values.csv", row.names = FALSE)
+```
+
+
+```{r pollen derivatives}
+# Eric's code
+#Function for calculating first derivatives of time series given a before,
+#after, and delta step size
+calc_1st_deriv = function(fit_before, fit_after,delta) {
+  (fit_after-fit_before)/(2*delta)
+}
+
+set.seed(10) #set a seed so this is repeatable
+n_sims = 250
+
+n_length = 240
+
+years <- seq(min(pollen_plot_data$negAge),
+             max(pollen_plot_data$negAge),
+             length.out = n_length)
+
+diff(years)
+model <- pollen_gam_S
+#model <- diatom_gam_I
+
+pred <- pollen_modS_fit
+#pred <- pollen_modI_fit
+
+# Generate multivariate normal simulations of model coefficients
+random_coefs <- t(rmvn(n_sims, mu = coef(model),V = vcov(model)))
+
+confint_sims <- crossing(spp=unique(pollen_plot_data$spp),
+                         negAge = seq(min(pollen_plot_data$negAge),
+                                      max(pollen_plot_data$negAge),
+                                      length.out = n_length),
+                         log_total_counts=0)
+
+map_pred_sims <- predict(model,
+                         confint_sims,
+                         type = "lpmatrix") %*% random_coefs %>%
+  as_data_frame() %>%
+  bind_cols(confint_sims)%>%
+  gather(key = simulation, value = pred, -negAge, -log_total_counts,-spp)
+
+
+#specifying the step size for numerical derivative calculations
+delta = 0.01
+
+#calculating the predicted value for the current year plus delta
+step_ahead_fits = confint_sims %>%
+  mutate(negAge = negAge+delta)%>%
+  predict(model, 
+          ., type = "lpmatrix") %*% random_coefs 
+
+
+#calculating the predicted value for the current year minus delta
+step_behind_fits = confint_sims %>%
+  mutate(negAge = negAge-delta)%>%
+  predict(model,
+          ., type = "lpmatrix") %*% random_coefs 
+
+
+#using the predicted values for year plus and minus delta to calculate
+#derivatives for each species for each simulation
+derivs <- calc_1st_deriv(step_behind_fits,step_ahead_fits,delta = delta)%>%
+  as_data_frame()%>%
+  bind_cols(confint_sims)%>%
+  gather(key = simulation,value = deriv, -spp,-negAge, -log_total_counts)
+
+#Creating summaries of derivatives for each simulation for each year
+deriv_summaries <- derivs %>%
+  group_by(negAge,simulation)%>%
+  summarize(deriv_mean = mean(deriv),
+            deriv_sd = sd(deriv))%>%
+  group_by(negAge)%>% #turning derivative summaries into 95% confidence intervals
+  select(-simulation)%>%
+  summarize_all(.funs = list(lower = ~quantile(.,probs = 0.025),
+                             upper = ~quantile(.,probs = 0.975),
+                             med   = ~quantile(.,probs = 0.5)))
+
+#Plotting mean rate of change plus the 95% CI
+mean_plot <- deriv_summaries %>%
+  ggplot(aes(x = negAge, 
+             y = deriv_mean_med, 
+             ymin = deriv_mean_lower,
+             ymax = deriv_mean_upper))+
+  geom_ribbon(fill="grey")+
+  geom_line()+
+  geom_hline(yintercept = 0, linetype=2) +
+  scale_y_continuous("")+
+  xlab("Cal years BP") +
+  theme_bw()
+mean_plot 
+
+#Plotting standard deviation of rate of change plus the 95% CI
+sd_plot <- deriv_summaries %>%
+  ggplot(aes(x = negAge, 
+             y = deriv_sd_med, 
+             ymin=deriv_sd_lower,
+             ymax=deriv_sd_upper))+
+  geom_ribbon(fill="grey")+
+  geom_line()+
+  geom_hline(yintercept = 0, linetype=2) +
+  scale_y_continuous("")+
+  xlab("Cal years BP") +
+  theme_bw()
+sd_plot
+
+## save derivative summaries for later use
+write.csv(deriv_summaries, "outputs/pollen-derivatives.csv", row.names = FALSE)
+```
+
+### Geochemistry and grainsize HGAM
+```{r HGAM grain size and geochemistry}
+## Read in interpolated data
+F9_geochem_grainsize <- read.csv("outputs/F9_geochem_grainsize_i.csv", sep = ",")[-1] 
+
+# Prepare data for modeling: grainsize
+grainsize_long <- F9_geochem_grainsize %>%
+  select(c(1,2,3,10,11,12,13,14)) %>%
+  gather(key = element, value = value, -depth, -upper_age, -lower_age) %>%
+  mutate(negAge = -upper_age) %>%
+  mutate(elapsedTime = round(abs(upper_age - lower_age),0)) %>%
+  filter(elapsedTime < 40000) %>%
+  filter(!is.na(as.numeric(value))) %>%
+  filter(!is.na(elapsedTime)) %>%
+  mutate(element = factor(element)) %>%
+  mutate(value_raw=value) %>%
+  mutate_at(vars(value), sqrt) %>% #
+  rename(value_sqrt=value)
+
+levels(grainsize_long$element)
+range(grainsize_long$elapsedTime)
+
+## Quick plot the trends
+grainsize_plot <- ggplot(grainsize_long, aes(x = value_raw, y = upper_age)) +
+  geom_lineh() +
+  #geom_smooth()+
+  scale_y_reverse() +
+  geom_point() +
+  facet_geochem_gridh(vars(element)) +
+  labs(x = NULL) +
+  labs(y = NULL)
+#ggtitle("XRF")
+grainsize_plot
+
+# Prepare data for modeling: geochem
+geochem_long <- F9_geochem_grainsize %>%
+  select(c(1,2,3,4,5,6,7,8,9)) %>%
+  gather(key = element, value = value, -depth, -upper_age, -lower_age) %>%
+  mutate(negAge = -upper_age) %>%
+  mutate(elapsedTime = round(abs(upper_age - lower_age),0)) %>%
+  filter(elapsedTime < 40000) %>%
+  filter(!is.na(as.numeric(value))) %>%
+  filter(!is.na(elapsedTime)) %>%
+  mutate(element = factor(element)) %>%
+  mutate(value_raw=value) %>%
+  mutate_at(vars(value), log) %>% #
+  rename(value_log=value)
+
+
+## Quick plot the trends
+geochem_plot <- ggplot(geochem_long, aes(x = value_raw, y = upper_age)) +
+  geom_lineh() +
+  #geom_smooth()+
+  scale_y_reverse() +
+  geom_point() +
+  facet_geochem_gridh(vars(element)) +
+  labs(x = NULL) +
+  labs(y = NULL)
+#ggtitle("XRF")
+geochem_plot
+
+# set dataset to analyze
+#df <- geochem_long
+
+#model S HGAM : similar smootheness between groups (spp) without global smooth 
+set.seed(10) #set a seed so this is repeatable
+grainsize_gam_S <- gam(value_sqrt ~ s(negAge, element, k=20, bs="fs"),
+                    weights = elapsedTime/mean(elapsedTime),
+                    data=grainsize_long,
+                    method = "REML")
+
+summary(grainsize_gam_S)
+gam.check(grainsize_gam_S)
+draw(grainsize_gam_S)
+
+#model I HGAM: different smootheness for each taxa without global smooth
+grainsize_gam_I<- gam(value_sqrt ~ s(negAge, by=element, k=20, bs="fs") +
+                     s(element, bs="re"),
+                   weights = elapsedTime/mean(elapsedTime),
+                   data=grainsize_long, 
+                   method = "REML")
+
+gam.check(grainsize_gam_I)
+draw(grainsize_gam_I)
+
+#Compare different model fits using AIC
+AIC_table <- AIC(grainsize_gam_S, grainsize_gam_I)%>%
+  rownames_to_column(var= "Model")%>%
+  mutate(data_source = rep(c("diatom_data")))%>%
+  group_by(data_source)%>%
+  mutate(deltaAIC = AIC - min(AIC))%>%
+  ungroup()%>%
+  dplyr::select(-data_source)%>%
+  mutate_at(.vars = vars(df,AIC, deltaAIC), 
+            .funs = funs(round,.args = list(digits=0)))
+
+AIC_table
+
+## Here the synthetic data to predict should be over the range of diatom ages to get the same ages for the synchronous/asynchronous model
+
+#Create synthetic data to predict over a range of ages: here match with diatom samples
+grainsize_plot_data <- with(grainsize_long, as_tibble(expand.grid(negAge = seq(min(diat_data$negAge), max(diat_data$negAge)), element = factor(levels(grainsize_long$element)))))
+
+grainsize_modS_fit <- predict(grainsize_gam_S, 
+                         newdata = grainsize_plot_data,
+                         se.fit = TRUE)
+
+grainsize_modI_fit <- predict(grainsize_gam_I,
+                         newdata = grainsize_plot_data,
+                         se.fit = TRUE)
+
+#non-shared trends
+grainsize_plot_data$modS_fit <- as.numeric(grainsize_modS_fit$fit)
+grainsize_plot_data$modI_fit <- as.numeric(grainsize_modI_fit$fit)
+
+# comparing non-shared trends
+grainsize_plot_data <- gather(grainsize_plot_data, key=model, value=fit, modS_fit, modI_fit)
+
+grainsize_plot_data <- mutate(grainsize_plot_data, se= c(as.numeric(grainsize_modS_fit$se.fit),
+                                               as.numeric(grainsize_modI_fit$se.fit)),
+                         upper = exp(fit + (2 * se)),
+                         lower = exp(fit - (2 * se)),
+                         fit   = exp(fit))
+
+
+#Plot the model output for non-shared trends, with means plus standard deviations for each model.
+grainsize_plot_model_labels <- paste("Model", c("S", "I"))
+grainsize_plot_model_labels <- factor(grainsize_plot_model_labels, levels = grainsize_plot_model_labels)
+
+#non-shared trends
+theme_set(theme_bw())
+theme_update(panel.grid = element_blank())
+
+grainsize_plot <- ggplot(grainsize_plot_data) +
+  facet_wrap(~element, nrow = 4,scales = "free_y")+
+  geom_ribbon(aes(x=negAge,
+                  ymin = lower,
+                  ymax = upper,
+                  fill = model),
+              alpha=0.2)+
+  geom_point(data= grainsize_long, aes(x = negAge, y = value_raw), size=0.06) +
+  geom_line(aes(x = negAge, y = fit, color = model))+
+  labs(y = "Absolute counts", x = "Age (cal yr BP)") +
+  scale_fill_brewer(name = "", palette = "Dark2",
+                    labels = grainsize_plot_model_labels) +
+  scale_colour_brewer(name = "",
+                      palette = "Dark2", labels = grainsize_plot_model_labels)+
+  theme(legend.position = "top",
+        strip.text = element_text(size=10))
+
+grainsize_plot
+
+# ggsave("outputs/pollen_plot.png",
+#        plot = pollen_plot ,
+#        width = 10,
+#        height=8,
+#        units="in",
+#        dpi = 300)
+
+
+## save model results for later use
+#write.csv(pollen_plot_data, "outputs/pollen-HGAMs-fitted-values.csv", row.names = FALSE)
+```
+
+```{r}
+calc_1st_deriv = function(fit_before, fit_after,delta) {
+  (fit_after-fit_before)/(2*delta)
+}
+
+set.seed(10) #set a seed so this is repeatable
+n_sims = 250
+n_length = 240
+
+years <- seq(min(grainsize_plot_data$negAge),
+             max(grainsize_plot_data$negAge),
+             length.out = n_length)
+
+diff(years)
+model <- grainsize_gam_I
+pred <- grainsize_modS_fit
+
+# Generate multivariate normal simulations of model coefficients
+random_coefs <- t(rmvn(n_sims, mu = coef(model),V = vcov(model)))
+
+confint_sims <- crossing(element=unique(grainsize_plot_data$element),
+                         negAge = seq(min(grainsize_plot_data$negAge),
+                                      max(grainsize_plot_data$negAge),
+                                      length.out = n_length))
+
+map_pred_sims <- predict(model,
+                         confint_sims,
+                         type = "lpmatrix") %*% random_coefs %>%
+  as_data_frame() %>%
+  bind_cols(confint_sims)%>%
+  gather(key = simulation, value = pred, -negAge)
+
+
+#specifying the step size for numerical derivative calculations
+delta = 0.01
+
+#calculating the predicted value for the current year plus delta
+step_ahead_fits = confint_sims %>%
+  mutate(negAge = negAge+delta)%>%
+  predict(model, 
+          ., type = "lpmatrix") %*% random_coefs 
+
+
+#calculating the predicted value for the current year minus delta
+step_behind_fits = confint_sims %>%
+  mutate(negAge = negAge-delta)%>%
+  predict(model,
+          ., type = "lpmatrix") %*% random_coefs 
+
+
+#using the predicted values for year plus and minus delta to calculate
+#derivatives for each species for each simulation
+derivs <- calc_1st_deriv(step_behind_fits,step_ahead_fits,delta = delta)%>%
+  as_data_frame()%>%
+  bind_cols(confint_sims)%>%
+  gather(key = simulation,value = deriv, -element,-negAge)
+
+#Creating summaries of derivatives for each simulation for each year
+deriv_summaries <- derivs %>%
+  group_by(negAge,simulation)%>%
+  summarize(deriv_mean = mean(deriv),
+            deriv_sd = sd(deriv))%>%
+  group_by(negAge)%>% #turning derivative summaries into 95% confidence intervals
+  select(-simulation)%>%
+  summarize_all(.funs = list(lower = ~quantile(.,probs = 0.025),
+                             upper = ~quantile(.,probs = 0.975),
+                             med   = ~quantile(.,probs = 0.5)))
+
+#Plotting mean rate of change plus the 95% CI
+mean_plot <- deriv_summaries %>%
+  ggplot(aes(x = negAge, 
+             y = deriv_mean_med, 
+             ymin = deriv_mean_lower,
+             ymax = deriv_mean_upper))+
+  geom_ribbon(fill="grey")+
+  geom_line()+
+  geom_point() +
+  geom_hline(yintercept = 0, linetype=2) +
+  scale_y_continuous("Average rate of change of log-abundance")+
+  xlab("Cal years BP") +
+  ggtitle("Diatoms") +
+  #ylab("Average rate of change of log-abundance") +
+  theme_bw()
+mean_plot 
+
+#Plotting standard deviation of rate of change plus the 95% CI
+sd_plot <- deriv_summaries %>%
+  ggplot(aes(x = negAge, 
+             y = deriv_sd_med, 
+             ymin=deriv_sd_lower,
+             ymax=deriv_sd_upper))+
+  geom_ribbon(fill="grey")+
+  geom_line()+
+  geom_hline(yintercept = 0, linetype=2) +
+  scale_y_continuous("")+
+  xlab("Cal years BP") +
+  theme_bw()
+sd_plot
+
+## save derivative summaries for later use
+write.csv(deriv_summaries, "outputs/grainsize-derivatives.csv", row.names = FALSE)
+
+## Save plot
+ggsave("outputs/diatoms_derivatives.png",
+       plot = last_plot(),
+       width=8,
+       height=6,
+       units="in",
+       dpi = 300)
+```
+
+
+
+
+```{r}
+
+d13C <- geochem_long %>% filter(element=="d13C")
+C_N <- geochem_long %>% filter(element=="TC_TN")
+
+#model GAM:
+set.seed(10) #set a seed so this is repeatable
+
+d13C_gam <- gam(value_raw ~ s(negAge, k=100, bs="ad"),  
+                    weights = elapsedTime / mean(elapsedTime),
+                    data=C_N,  select = TRUE, 
+                    method = "REML")
+
+plot(d13C_gam, scale = 0)
+gam.check(d13C_gam)
+summary(d13C_gam)
+
+## Here the synthetic data to predict should be over the range of diatom ages to get the same ages for the synchronous/asynchronous model
+## see negAge argument
+d13C_plot_data <- with(d13C, 
+                     as_tibble(expand.grid(negAge = seq(min(diat_data$negAge), max(diat_data$negAge)))))
+                                                            
+
+# Predict over the range of new values
+d13C_mod_fit <- predict(d13C_gam, 
+                      newdata = d13C_plot_data,
+                      se.fit = TRUE,
+                      type = "link")
+
+#
+d13C_plot_data$mod_fit <- as.numeric(d13C_mod_fit$fit)
+
+
+# For one model only
+d13C_plot_data <- gather(d13C_plot_data, key=model, value=fit, mod_fit)
+d13C_plot_data <- mutate(d13C_plot_data, se= c(as.numeric(d13C_mod_fit$se.fit)),
+                           upper = exp(fit + (2 * se)),
+                           lower = exp(fit - (2 * se)),
+                           fit   = exp(fit))
+
+# Plot
+theme_set(theme_bw())
+theme_update(panel.grid = element_blank())
+
+d13C_plt <- ggplot(d13C_plot_data) +
+  geom_ribbon(aes(x=negAge,
+                  ymin = lower,
+                  ymax = upper,
+                  fill = model),
+              alpha=0.2)+
+  geom_point(data= C_N, aes(x = negAge, y = value_raw), size=0.06) +
+  geom_line(aes(x = negAge, y = fit, color = model))+
+  labs(y = "Ti (counts)", x = "Age (cal yr BP)") +
+  scale_fill_brewer(name = "", palette = "Dark2") +
+  scale_colour_brewer(name = "",
+                      palette = "Dark2")+
+  theme(legend.position = "top",
+        strip.text = element_text(size=10))
+
+d13C_plt
+
+```
+
+
+Generalized Least Squares (GLS) -- **Synchronous model**
++  Modeling effects of pollen rates of change on diatom rate of change
+```{r}
+# Read in functions
+source("scripts/functions_custom.R")
+
+# Read in smoothed derivative proxy (diatoms, native pollen, and agropastoralism) time series
+pollen_deriv <- read.csv("outputs/pollen-derivatives.csv") %>%
+  select(negAge, deriv_mean_med, deriv_mean_lower, deriv_mean_upper)
+  select(negAge,deriv_mean_med) %>%
+  rename(pollen_deriv=deriv_mean_med) %>%
+  rename(age=negAge) %>% 
+  data.frame()
+pollen_deriv$age <- round(pollen_deriv$age, 1)
+round(diff(pollen_deriv$age, 1))[1]
+
+diatom_deriv <- read.csv("outputs/diatom-derivatives.csv")  %>%
+  select(negAge, deriv_mean_med, deriv_mean_lower, deriv_mean_upper)
+  select(negAge,deriv_mean_med) %>%
+  rename(diatom_deriv=deriv_mean_med) %>%
+  rename(age=negAge) %>% 
+  data.frame()
+diatom_deriv$age <- round(diatom_deriv$age, 1)
+
+grainsize_deriv <- read.csv("outputs/grainsize-derivatives.csv")  %>%
+  select(deriv_mean_med, deriv_mean_lower, deriv_mean_upper)
+  select(negAge,deriv_mean_med) %>%
+  rename(grainsize_deriv=deriv_mean_med) %>%
+  rename(age=negAge) %>% 
+  data.frame()
+grainsize_deriv$age <- round(grainsize_deriv$age, 1)
+
+## Synchrony analysis
+# pollen ~ diatoms
+df <- cbind(diatom_deriv, pollen_deriv, grainsize_deriv)
+df[,c(3,5)] <- NULL
+#colnames(df) <- c("diat_deriv_mean", "diat_sd_mean", "agropast_deriv_mean", "agropast_sd_mean")
+
+#fitting GLS model without autocorrelated residuals
+diat.pollen.gls <- gls(diatom_deriv ~ grainsize_deriv, data=df)
+summary(diat.agropast.gls)
+
+#check autocorrelation of the residuals
+acf(residuals(diat.pollen.gls)) # evidence for correlated residuals
+pacf(residuals(diat.pollen.gls)) # indicates AR1
+
+#fitting GLS model with autocorrelated residuals
+diat.pollen.gls <- gls(diatom_deriv ~ grainsize_deriv, 
+                         data=df, correlation=corARMA(p=1))
+
+#pseudo R2 (gls doesn't provide R2)
+diat.pollen.gls.R2 <- cor(df$diatom_deriv, 
+                          predict(diat.pollen.gls))^2 
+
+df$diat.pollen.predicted <- predict(diat.pollen.gls)
+
+#plotting diatom vs agropastoralismr
+diatoms_pollen_plt <- ggplot(data=df, aes(x=grainsize_deriv, y=diatom_deriv)) + 
+  geom_point(shape=21, fill="gray50", color="black", size=4, alpha=0.5) +
+  geom_line(aes(x=grainsize_deriv, y=diat.pollen.predicted), size=2, color="red4", alpha=0.6) +
+  ylab("Diatoms (st. dev of rate of change of log-abundance)") + 
+  xlab("pollen-indicators (st. dev of rate of change of log-abundance)") +
+  ggtitle("Diatoms vs. Pollen") +
+  theme(text=element_text(size=9), plot.title=element_text(size = 12))
+
+diatoms_pollen_plt
+
+```
+
+Generalized Least Squares (GLS) -- **Asynchronous model**
+
+The **asynchronous model** consists in two steps:
+
++  Generating lagged time series: diatom samples (response) are paired with antecedent samples of predictors (pollen)
++  Modeling time-delayed effects of pollen rates of change (separately) on diatom rate of change
+
+```{r}
+### Backward lags
+# lags * temp resolution = 40 * 1000 = 40000
+
+lags<-1:20
+
+# rename datasets for the function to work
+diat <- diatom_deriv
+pollen <- pollen_deriv 
+
+#backward dataset 
+lag.data.backward <- backwardLags(
+  lags=lags, 
+  reference.data=diatom_deriv, 
+  data.to.lag=pollen_deriv
+)
+
+# Fitting a GLS model per lag on backward datasets
+backward.results <- modelLagData(
+  model.formula="diatom_deriv ~ pollen_deriv", 
+  lagged.data=lag.data.backward
+)
+
+backward.results$value <- round(backward.results$value, 2)
+
+# Fitting a null model
+backward.results.random <- modelRandomLagData(
+  lagged.data=lag.data.backward, 
+  model.formula="diatom_deriv ~ pollen_deriv", 
+  iterations=1000
+)
+
+backward.results.random$value <- round(backward.results.random$value, 2)
+
+# Plot model results
+## Set axes limits
+max.lag = max(c(backward.results$lag))
+max.coefficient = round(max(c(backward.results[backward.results$variable=="Coefficient", "value"], backward.results.random[backward.results.random$variable=="Coefficient", "upper"])) + 0.1, 1)
+min.coefficient = round(min(c(backward.results[backward.results$variable=="Coefficient", "value"], backward.results.random[backward.results.random$variable=="Coefficient", "lower"])) - 0.1, 1)
+max.R2 = round(max(c(backward.results[backward.results$variable=="R2", "value"])), 1)
+
+library(viridis)
+viridis.colors <- viridis(10, option="D")
+
+backward.plot.coefficient <- ggplot(data=subset(backward.results, variable=="Coefficient"), aes(x=lag, y=value)) +
+  geom_ribbon(data=subset(backward.results.random, variable=="Coefficient"), aes(ymin=lower, ymax=upper), alpha=0.3, fill="light grey") +
+  geom_line(data=subset(backward.results.random, variable=="Coefficient"), aes(x=lag, y=value), alpha=0.6, color="light grey", size=1) +
+  geom_hline(yintercept=0, color="black", linetype=2) +
+  geom_ribbon(aes(ymin=lower,ymax=upper), alpha=0.3, fill=viridis.colors[2]) +
+  geom_line(size=1.5, color=viridis.colors[1]) +
+  ggtitle(expression("Pollen" %->% "Diatoms")) +
+  theme(legend.position="none") +
+  xlab("") +
+  ylab("Standardized coefficient") +
+  scale_y_continuous(breaks=seq(min.coefficient, max.coefficient, by=0.8)) +
+  #scale_x_reverse()+
+  theme(axis.text.y = element_text(size=16),
+        axis.text.x = element_text(size=16),
+        axis.title.y = element_text(size=16),
+        plot.title = element_text(size=16),
+        plot.margin = unit(c(0, 0, 0, 0), "cm"),
+        axis.title.x=element_blank()) +
+        #axis.text.x=element_blank(),
+        #axis.line.x=element_blank(),
+        #axis.ticks.x = element_blank()) +
+  theme_classic()
+  #coord_cartesian(ylim = c(min.coefficient, max.coefficient + 0.5))
+
+#backward.plot.coefficient
+
+backward.plot.R2 <- ggplot(data=subset(backward.results, variable=="R2"), aes(x=lag, y=value, group=variable)) +
+  geom_ribbon(data=subset(backward.results.random, variable=="R2"), aes(ymin=lower, ymax=upper), alpha=0.3, fill="light grey") +
+  geom_line(data=subset(backward.results.random, variable=="R2"), aes(x=lag, y=value), alpha=0.6, color="light grey", size=1.5) +
+  geom_line(size=1.5, color=viridis.colors[2]) +
+  theme(legend.position="none") +
+  xlab("Years (before Diatom samples)") +
+  ylab("Pseudo R squared") +
+  scale_y_continuous(breaks=seq(0, max.R2, by=0.1)) +
+  #scale_x_reverse()+
+  theme(axis.text.y = element_text(size=16),
+        axis.text.x = element_text(size=16),
+        plot.title = element_text(size=16),
+        axis.title.y = element_text(size=16),
+        plot.margin = unit(c(0.2, 0.5, 0, 0), "cm")) +
+  theme_classic() +
+  coord_cartesian(ylim = c(0, max.R2 + 0.05))
+
+#backward.plot.R2
+
+#Combine the two plots
+library(cowplot)
+plot_composite <- plot_grid(backward.plot.coefficient, 
+                            backward.plot.R2, ncol = 1, 
+                            rel_heights = c(1, 1), align="v") + 
+                            theme(plot.margin = unit(c(0.5, -1, 0.5, 0.5), "cm"))
+plot_composite
+
+# save plot
+ggsave("outputs/pollen_diatoms_asycnchronousModel.png",
+       plot = plot_composite,
+       width=8,
+       height=6,
+       units="in",
+       dpi = 300)
+
 ```
 
 
