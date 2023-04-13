@@ -2,6 +2,8 @@
 #### STRATIPLOTS #####
 ######################
 
+## To work with interpolated dataset (yearly)
+
 source("scripts/functions_custom.R") #functions to lag datasets and model (Blas) and binning (Seddon)
 library(tidyverse)
 library(tidypaleo)
@@ -26,7 +28,7 @@ names(all_data[[1]])
 # extract datasets
 aquatics <- all_data[[1]]$IntCln_aquatics 
 aquatics <- aquatics[, !(names(aquatics) %in% c("age", "depth"))]
-totals <- apply(aquatics, 1, sum) #suma les abund?ncies
+totals <- apply(aquatics, 1, sum) #suma les abundancies
 aquatics <- aquatics / totals * 100 #calcul proporcions
 
 pollen <- all_data[[1]]$IntClen_pollen[-1]
@@ -66,6 +68,16 @@ nms_list <- data.frame(taxa = c(colnames(diatoms), colnames(pollen), colnames(aq
                                  rep("Aquatics",length(aquatics)),
                                  rep("Geochemistry", length(geochem))))
 
+nms_aquatics <- data.frame(taxa = c(colnames(aquatics), colnames(diatoms)),
+                           group = c("floating", "emergent", "submerged", "emergent", "floating", "submerged",
+                                     "submerged", "unknown", "emergent", "unknown", "floating", "floating", 
+                                     rep("Diatoms", length(diatoms))))
+
+nms_aquatics <- data.frame(taxa = c(colnames(aquatics)),
+                           group = c("floating", "emergent", "submerged", "emergent", "floating", "submerged",
+                                     "submerged", "unknown", "emergent", "unknown", "floating", "floating"))
+
+
 #gather dataset for plotting
 df_long <- combinedData %>% 
   as.data.frame() %>%
@@ -73,8 +85,8 @@ df_long <- combinedData %>%
   mutate(age=as.numeric(age)) %>%
   gather(key=taxa, value=relative_abundance_percent, -age) %>%
   mutate(assemblage = plyr::mapvalues(taxa, from = nms_list$taxa, to = nms_list$group)) %>%
-  mutate(taxa=factor(taxa),
-         taxa = fct_reorder(taxa, relative_abundance_percent)) %>%
+  #mutate(assemblage2 = plyr::mapvalues(taxa, from = nms_aquatics$taxa, to = nms_aquatics$group)) %>%
+  mutate(taxa=factor(taxa)) %>%
   mutate(taxa=reorder(taxa,relative_abundance_percent)) %>%
   group_by(assemblage,taxa) %>%
   arrange(relative_abundance_percent) %>%
@@ -88,25 +100,37 @@ theme_set(theme_bw(12))
 #theme_set(theme_paleo())
 
 ## subset biotic assemblages
-assemblage_data <- df_long %>% filter(assemblage!="Geochemistry") %>%
-  filter(relative_abundance_percent>4) %>%
+assemblage_data <- df_long %>% 
+  filter(assemblage!="Geochemistry") %>%
+  filter(assemblage!="Pollen") %>%
+  #filter(relative_abundance_percent>4) %>%
   mutate(assemblage=factor(assemblage)) %>%
-  droplevels() %>%
-  mutate(taxa = fct_relevel(taxa, "Alnus", "Aragoa", "Asteraceae.Asteroidea", "Asteraceae.Liguliflora", "Borreria",
-                            "Caryophyllaceae", "Cecropia", "Dodonea", "Ericaceae", "Geranium", "Hedyosmum", "Hypericum",
-                            "Ilex", "Lycopodium", "Lycopodium.Foveolate", "Miconia", "Myrica", "Poaceae", "Podocarpus", "Polylepis.Acaena",
-                            "Puya", "Quercus", "Rumex", "Sordariaceae", "Sporormiella", "Tot.LocTot.100", "Weinmannia",
-                            "Cyperaceae", "Debarya", "Hydrocotyle", "Isoetes", "Ludwigia", "Myriophyllum", "Polygonum",
-                            "Potamogeton", "Spirogyra", "Umbelliferae", "Typha", "Zygnema",
-                            "Non.motile.planktonic", "Non.motile.tychoplanktonic", "Non.motile.benthic", "Slightly...weakly..mod.motile",
-                            "Highly.motile")) %>%
-  mutate(assemblage = fct_relevel(assemblage, "Pollen", "Aquatics", "Diatoms"))
+  group_by(age, taxa) %>%
+  mutate(taxa = fct_relevel(taxa, "Non.motile.planktonic", "Non.motile.tychoplanktonic", "Non.motile.benthic", "Slightly...weakly..mod.motile",
+                            "Highly.motile", "Cyperaceae", "Debarya", "Hydrocotyle", "Isoetes", "Ludwigia", "Myriophyllum", "Polygonum",
+                            "Potamogeton", "Spirogyra", "Umbelliferae", "Typha", "Zygnema")) %>%
+  mutate(assemblage = plyr::mapvalues(taxa, from = nms_aquatics$taxa, to = nms_aquatics$group)) %>%
+  
+  # mutate(floating=sum(relative_abundance_percent[taxa=="Ludwigia" | taxa=="Hydrocotyle"| taxa=="Spirogyra"| taxa=="Zygnema"])) %>%
+  # mutate(emergent=sum(relative_abundance_percent[taxa=="Polygonum" | taxa=="Typha" | taxa=="Cyperaceae"])) %>%
+  # mutate(submerged=sum(relative_abundance_percent[taxa=="Potamogeton" | taxa=="Isoetes" | taxa=="Myriophyllum"])) %>%
+  droplevels()
+  # mutate(taxa = fct_relevel(taxa, "Alnus", "Aragoa", "Asteraceae.Asteroidea", "Asteraceae.Liguliflora", "Borreria",
+  #                           "Caryophyllaceae", "Cecropia", "Dodonea", "Ericaceae", "Geranium", "Hedyosmum", "Hypericum",
+  #                           "Ilex", "Lycopodium", "Lycopodium.Foveolate", "Miconia", "Myrica", "Poaceae", "Podocarpus", "Polylepis.Acaena",
+  #                           "Puya", "Quercus", "Rumex", "Sordariaceae", "Sporormiella", "Tot.LocTot.100", "Weinmannia",
+  #                           "Cyperaceae", "Debarya", "Hydrocotyle", "Isoetes", "Ludwigia", "Myriophyllum", "Polygonum",
+  #                           "Potamogeton", "Spirogyra", "Umbelliferae", "Typha", "Zygnema",
+  #                           "Non.motile.planktonic", "Non.motile.tychoplanktonic", "Non.motile.benthic", "Slightly...weakly..mod.motile",
+  #                           "Highly.motile")) %>%
+  #mutate(assemblage = fct_relevel(assemblage, "Pollen", "Aquatics", "Diatoms"))
 
 ## Plot
-assemblage_plot <- ggplot(assemblage_data, aes(x = relative_abundance_percent, y = age, colour=assemblage)) +
+assemblage_plot <- ggplot(assemblage_data, aes(x = relative_abundance_percent, y = age)) +
   geom_col_segsh(size=1.3) +
   scale_y_reverse() +
-  facet_abundanceh(vars(taxa), rotate_facet_labels = 90) +
+  geom_areah() +
+  facet_abundanceh(vars(assemblage), rotate_facet_labels = 70) +
   #facet_abundanceh(vars(taxa), grouping = vars(assemblage), rotate_facet_labels = 70) +
   #geom_lineh_exaggerate(exaggerate_x = 5, col = "grey70", lty = 2) +
   labs(x = "Relative abundance (%)", y = "cal years BP", colour="Assemblage") +
@@ -154,7 +178,7 @@ strat_plt2 <- wrap_plots(
 )
 strat_plt2
 
-ggsave("outputs/proxies_stratplot_Fuquene.png", strat_plt2, height = 11, width = 15, dpi=300)
+ggsave("outputs/aquatic_proxies_stratplot_Fuquene.png", strat_plt2, height = 11, width = 15, dpi=300)
 
 
 

@@ -167,16 +167,16 @@ diat_plot
 ## Clean data and Estimate Principal Curves (PrC) of the F9 pollen core
 ```{r pollen data F9, echo=FALSE, warning=FALSE}
 #Read in F9 pollen record
-F_pollen <- read.csv("data/Fuquene_pollen_counts.csv") %>%
+F9_pollen <- read.csv("data/Fuquene_F9_pollen.csv") %>%
   #rename(depth=ï..depth) %>% #rename extraneous column name  
   select(-c(contains("Lycopo") | contains("Tot.LocTot.100"))) %>%
-  select(-c(66,67,68,70)) %>% 
+  #select(-c(66,67,68,70)) %>% #exclude spores 
   rename(depth=ï..depth)
 
-names(F_pollen)
+names(F9_pollen)
 
 #this is to transform to tidy format, calculate % and subset more common species
-pollen_long <- F_pollen %>% 
+pollen_long <- F9_pollen %>% 
   gather(key = taxa, value = count, -depth, -upper_age, -lower_age) %>%
   #mutate(taxa = plyr::mapvalues(taxa, from = changes[,1], to = changes$new_2)) %>%
   group_by(depth, taxa, upper_age, lower_age) %>%
@@ -187,6 +187,8 @@ pollen_long <- F_pollen %>%
   group_by(depth) %>%
   mutate(relative_abundance_percent = count / sum(count) * 100) %>%
   ungroup()
+
+range(pollen_long$upper_age)
 
 # filter more abundant taxa; format need to be on long-wide format-->no spreaded 
 core_common_taxa <- pollen_long %>%
@@ -249,22 +251,81 @@ PollenPlot <- ggplot(PollenPrC, aes(x = upper_age, y = PrC)) +
 PollenPlot
 ```
 
+##Clean data and estimate PrC of the Fuquene 7 pollen record
+```{r pollen data F7, warning=FALSE}
+#Read in F9 pollen record
+F7_pollen <- read.csv("data/Fuquene_F7_pollen.csv", sep = ";") %>%
+  #rename(depth=ï..depth) %>% #rename extraneous column name  
+  select(-c(contains("Lycopo"))) %>%
+  select(-c(115,116,117,118,119)) %>% #exclude spores 
+  rename(depth=ï..depth)
+
+names(F7_pollen)
+
+#this is to transform to tidy format, calculate % and subset more common species
+pollen_long <- F7_pollen %>% 
+  gather(key = taxa, value = count, -depth, -upper_age, -lower_age) %>%
+  #mutate(taxa = plyr::mapvalues(taxa, from = changes[,1], to = changes$new_2)) %>%
+  group_by(depth, taxa, upper_age, lower_age) %>%
+  summarise(count = sum(count)) %>%
+  filter(!count == "0" ) %>% #this is to remove empty samples (rows)
+  filter(!upper_age==0.0) %>% #this is to drop extraneous ages
+  ungroup() %>%
+  group_by(depth) %>%
+  mutate(relative_abundance_percent = count / sum(count) * 100) %>%
+  ungroup()
+
+range(pollen_long$upper_age) ## ULL here, need to transform to numeric
+
+# filter more abundant taxa; format need to be on long-wide format-->no spreaded 
+core_common_taxa <- pollen_long %>%
+  group_by(taxa) %>%
+  summarise(max_rel_abund = max(relative_abundance_percent)) %>%
+  filter(max_rel_abund >= 5) %>%
+  arrange(max_rel_abund) %>%
+  pull(taxa)
+
+# select from initial table
+core_counts_common_F7 <- pollen_long %>%
+  filter(taxa %in% core_common_taxa) %>%
+  mutate(taxa = factor(taxa, levels = core_common_taxa)) %>%
+  arrange(taxa)
+
+#make it wide--relative abundance
+core_counts_wide_F7 <- core_counts_common_F7 %>%
+  select(depth, upper_age, lower_age, taxa, relative_abundance_percent) %>%
+  spread(key = taxa, value = relative_abundance_percent) %>%
+  arrange(upper_age)
+
+#make it wide--counts
+core_counts_wide_F9 <- core_counts_common_F7 %>%
+  select(depth, upper_age, lower_age, taxa, count) %>%
+  spread(key = taxa, value = count) %>%
+  arrange(upper_age)
+
+# check age core ranges
+range(core_counts_wide_F9$upper_age)
+
+```
+
+
+
 
 ## Clean data and Estimate Principal Curves (PrC) of the M1 pollen core
 ```{r pollen data M1, echo=FALSE, warning=FALSE}
-M1_pollen_all <- read.csv("data/Fuquene_pollen_M1_counts.csv") %>%
+M1_pollen <- read.csv("data/Fuquene_pollen_M1_counts.csv") %>%
     select(-c(contains("Lycopo") | contains("Carbones") | contains("concentration") | contains("Suma.total") |
-                contains("Pollen.spores"))) %>%
+                contains("Pollen.spores") | contains("Huevo"))) %>%
     rename(depth=ï..depth) #rename extraneous column name 
 
 
 # here drop out algae and spores
-names(M1_pollen_all)
-drop <- c(85:119) #indexes where spores and algae are
-
-M1_pollen <- M1_pollen_all %>% 
-  select(!all_of(drop)) %>% select(-c(contains("Huevo")))
 names(M1_pollen)
+#drop <- c(85:119) #indexes where spores and algae are
+
+# M1_pollen <- M1_pollen_all %>% 
+#   select(!all_of(drop)) %>% select(-c(contains("Huevo")))
+# names(M1_pollen)
 
 # check ages ranges
 range(M1_pollen$upper_age)
@@ -308,15 +369,14 @@ core_counts_wide_M1 <- core_counts_common_M1 %>%
 
 ```
 
-## Join M1 and F7 records by common taxa names (columns)
-
+## Join M1 and F9 records by common taxa names (columns)
 ```{r join pollen records, echo=FALSE, message=FALSE, warning=FALSE}
 #combine cores (join's analogue package function)
 df <- analogue::join(core_counts_wide_M1, core_counts_wide_F9, verbose = TRUE)
 
 #check NA in the list and name the list
 listnans <- lapply(df, function(x) sum(is.na(x)))
-names(df) <- c("M1", "F7")
+names(df) <- c("M1", "F9")
 
 # extract merged cores and sort by age
 merged <- plyr::ldply(df, data.frame)
