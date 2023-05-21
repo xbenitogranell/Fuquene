@@ -15,7 +15,7 @@ This workflow is written as a R Markdown document to show initial exploratory an
 
 ### Three sediment cores, composite of 250 kyr diatom, geochemical and pollen record
 + **F9**: 60-m long, sampled for diatom, pollen and geochemistry
-+ **F7**: sampled for diatoms
++ **F7**: sampled for diatoms and pollen
 + **M1**: sampled for diatoms and pollen
 
 
@@ -59,6 +59,7 @@ new <- diatoms_save %>%
   summarise(count = sum(count)) %>%
   filter(!count == "0" ) %>% #this is to remove empty samples (rows)
   filter(!upper_age==0.0) %>% #this is to drop extraneous ages
+  filter(!is.na(lower_age)) %>%
   ungroup() %>%
   group_by(depth) %>%
   mutate(relative_abundance_percent = count / sum(count) * 100) %>%
@@ -112,6 +113,7 @@ scrs_prc <- scores(diat_prc, display = "curve")
 
 # Combine dataframe with ages and depths
 diatomsPrC <- cbind(agedepth, scrs_prc)
+diatomsPrC$proxy <- "diatoms"
 
 # Plot Pcurves with depth and ages
 diat_plt_prc <- ggplot(diatomsPrC, aes(x = upper_age, y = PrC)) +
@@ -227,7 +229,7 @@ mean(diff(core_counts_wide_F9$upper_age))
 plot.ts(diff(core_counts_wide_F9$upper_age))
 ```
 
-### Plot PrC trends
+### Run and Plot PrC trends
 ```{r}
 # remove agedepth columns for Hellinger transformation and bind back
 agedepth <- core_counts_wide_F9[,names(core_counts_wide_F9) %in% c("depth", "upper_age", "lower_age")]
@@ -254,13 +256,14 @@ PollenPlot
 ##Clean data and estimate PrC of the Fuquene 7 pollen record
 ```{r pollen data F7, warning=FALSE}
 #Read in F9 pollen record
-F7_pollen <- read.csv("data/Fuquene_F7_pollen.csv", sep = ";") %>%
+F7_pollen <- read.csv("data/Fuquene_F7_pollen.csv", sep = ",") %>%
   #rename(depth=ï..depth) %>% #rename extraneous column name  
   select(-c(contains("Lycopo"))) %>%
   select(-c(115,116,117,118,119)) %>% #exclude spores 
   rename(depth=ï..depth)
 
 names(F7_pollen)
+str(F7_pollen)
 
 #this is to transform to tidy format, calculate % and subset more common species
 pollen_long <- F7_pollen %>% 
@@ -275,7 +278,7 @@ pollen_long <- F7_pollen %>%
   mutate(relative_abundance_percent = count / sum(count) * 100) %>%
   ungroup()
 
-range(pollen_long$upper_age) ## ULL here, need to transform to numeric
+range(pollen_long$upper_age) 
 
 # filter more abundant taxa; format need to be on long-wide format-->no spreaded 
 core_common_taxa <- pollen_long %>%
@@ -298,20 +301,17 @@ core_counts_wide_F7 <- core_counts_common_F7 %>%
   arrange(upper_age)
 
 #make it wide--counts
-core_counts_wide_F9 <- core_counts_common_F7 %>%
+core_counts_wide_F7 <- core_counts_common_F7 %>%
   select(depth, upper_age, lower_age, taxa, count) %>%
   spread(key = taxa, value = count) %>%
   arrange(upper_age)
 
 # check age core ranges
-range(core_counts_wide_F9$upper_age)
+range(core_counts_wide_F7$upper_age)
 
 ```
 
-
-
-
-## Clean data and Estimate Principal Curves (PrC) of the M1 pollen core
+## Clean data of the M1 pollen core
 ```{r pollen data M1, echo=FALSE, warning=FALSE}
 M1_pollen <- read.csv("data/Fuquene_pollen_M1_counts.csv") %>%
     select(-c(contains("Lycopo") | contains("Carbones") | contains("concentration") | contains("Suma.total") |
@@ -369,34 +369,39 @@ core_counts_wide_M1 <- core_counts_common_M1 %>%
 
 ```
 
-## Join M1 and F9 records by common taxa names (columns)
+## Join M1, F7 and F9 records by common taxa names (columns)
 ```{r join pollen records, echo=FALSE, message=FALSE, warning=FALSE}
 #combine cores (join's analogue package function)
-df <- analogue::join(core_counts_wide_M1, core_counts_wide_F9, verbose = TRUE)
+df <- analogue::join(core_counts_wide_M1, core_counts_wide_F7, core_counts_wide_F9, verbose = TRUE)
 
 #check NA in the list and name the list
 listnans <- lapply(df, function(x) sum(is.na(x)))
-names(df) <- c("M1", "F9")
+names(df) <- c("M1", "F7", "F9")
 
 # extract merged cores and sort by age
 merged <- plyr::ldply(df, data.frame)
 # merged <- merged[,-1] #remove .id variable
 
-pollen_M1_F9 <- merged[order(merged$upper_age),] %>% #arrange in increasing age
+pollen_M1_F7_F9 <- merged[order(merged$upper_age),] %>% #arrange in increasing depth
                   rename(core=.id)
 
+# remove extraneous samples with negative ages
+pollen_M1_F7_F9 <- pollen_M1_F7_F9 %>%
+  filter(upper_age > -70) %>%
+  filter(!lower_age==0.0) #this is to drop extraneous ages
+
 # write results
-write.csv(pollen_M1_F9, "outputs/pollen_M1_F9_counts.csv")
+write.csv(pollen_M1_F7_F9, "outputs/pollen_M1_F7_F9_counts.csv")
 ```
 
-## Stratigraphic plot pollen cores M1 and F7
+## Stratigraphic plot pollen cores M1, F7 and F9
 ```{r}
 # Gather dataset
-pollen_long_M1_F9 <- pollen_M1_F9 %>% 
+pollen_long_M1_F7_F9 <- pollen_M1_F7_F9 %>% 
   gather(key = taxa, value = relative_abundance_percent, -depth, -upper_age, -lower_age, -core) 
 
 # Plot  
-pollen_plot <- ggplot(pollen_long_M1_F9, aes(x = relative_abundance_percent, y = upper_age)) +
+pollen_plot <- ggplot(pollen_long_M1_F7_F9, aes(x = relative_abundance_percent, y = upper_age)) +
   geom_col_segsh() +
   scale_y_reverse() +
   facet_abundanceh(vars(taxa)) +
@@ -404,35 +409,193 @@ pollen_plot <- ggplot(pollen_long_M1_F9, aes(x = relative_abundance_percent, y =
   # add CONISS zones
   #geom_hline(yintercept = zones, col = "blue", lty = 1, alpha = 0.7) 
 pollen_plot
+
 ```
 
-## Composite pollen M1 & M9 cores (>%5 relative abundance & counts)
+## Composite pollen M1, F7 & F9 cores (>%5 relative abundance & counts)
 ```{r}
 ## Read in change nms table
-nms_pollen <- read.csv("data/nms_changes_pollenM1M9.csv", sep = ";")
+nms_pollen <- read.csv("data/nms_changes_pollen_M1_F7_F9.csv", sep = ",")
 head(nms_pollen)
+#colnames(nms_pollen)[1] <- "taxa"
 
 ## Change pollen names and groups
-pollen_M1_F9 <- read.csv("outputs/pollen_M1_F9_ra.csv")[-1] %>% #remove column core
-  gather(key = taxa, value = prop, -depth, -upper_age, -lower_age, -core) %>%
+pollen_M1_F7_F9 <- read.csv("outputs/pollen_M1_F7_F9_counts.csv")[-1] %>% #remove column core
+  gather(key = taxa, value = count, -depth, -upper_age, -lower_age, -core) %>%
   mutate(taxa = plyr::mapvalues(taxa, from = nms_pollen[,1], to = nms_pollen$new)) %>%
   mutate(group = plyr::mapvalues(taxa, from = nms_pollen[,2], to = nms_pollen$habitat)) %>%
+  mutate(habitat = plyr::mapvalues(taxa, from = nms_pollen[,2], to = nms_pollen$aquatic_habitat)) %>%
+  #mutate(group = replace(group, str_detect(group, "Botryococcus"), "Algae")) %>% #something weird with Botryococcus
+   #mutate(habitat = replace(habitat, str_detect(habitat, "Botryococcus"), "submerged")) %>% #something weird with Botryococcus
   group_by(depth, upper_age, lower_age) %>%
-  mutate(sqrt_pc = sqrt(prop)) %>%
-  mutate(Norm_sqrt_pc=sqrt_pc/sum(sqrt_pc)*100) %>%
+  mutate(relative_abundance_percent = count / sum(count) * 100,
+         sqrt_pc = sqrt(relative_abundance_percent),
+         Norm_sqrt_pc=sqrt_pc/sum(sqrt_pc)*100) %>%
   ungroup() %>%
+  mutate(group=factor(group)) %>%
+  mutate(habitat=factor(habitat)) %>%
   select(-sqrt_pc) 
+
+levels(pollen_M1_F7_F9$group)
+levels(pollen_M1_F7_F9$habitat)
 
 ## Plot the data
 theme_set(theme_bw(base_size=16))
-ggplot(pollen_M1_M9, aes(y=upper_age, x=Norm_sqrt_pc)) +
-  geom_line(orientation="y") +
-  facet_grid(. ~ group, scales="free_x", space="free_x") +
+pollen_plot <- ggplot(pollen_M1_F7_F9, aes(x = Norm_sqrt_pc, y = upper_age)) +
+  geom_col_segsh() +
+  #scale_y_reverse() +
+  facet_abundanceh(vars(habitat)) +
+  labs(x = "Relative abundance (%)", y = "Cal yr BP") +
   scale_x_continuous(breaks=seq(0, 100, by=20)) +
-  scale_y_reverse(breaks=seq(0, 284000, by=1000)) +
-  labs(x="%", y="Years BP")
+  scale_y_reverse(breaks=seq(0, 284000, by=20000)) +
+  ggtitle("Fuquene composite pollen record (M1, F7 and F9)")
+pollen_plot
+
+ggsave("outputs/pollen_composite_groups.png",
+       plot = last_plot() ,
+       width = 10,
+       height=8,
+       units="in",
+       dpi = 300)
+
+## Spread using pivot_wider
+poll_wide <- pollen_M1_F7_F9 %>% 
+  pivot_wider(id_cols=c(depth, upper_age, lower_age), 
+  names_from=c("taxa", "group", "habitat"), values_from=c(count,relative_abundance_percent), values_fill=0)
+
+poll_wide <- pollen_M1_F7_F9 %>%
+  droplevels() %>%
+  select(depth, upper_age, lower_age, taxa, relative_abundance_percent) %>%
+  spread(key = taxa, value = relative_abundance_percent) %>%
+  arrange(upper_age) #sort by increasing time
+  
+## Separate aquatics and non-aquatics pollen
+aq_floating <- pollen_M1_F7_F9 %>%
+  filter(str_detect(habitat, "floating")) %>%
+  droplevels() %>%
+  group_by(depth) %>%
+  mutate(total_sample = sum(count),
+         relative_abundance_percent = count / sum(count) * 100) %>%
+  filter(!total_sample==0) %>%
+  ungroup() %>%
+  select(depth, upper_age, lower_age, taxa, relative_abundance_percent) %>%
+  spread(key = taxa, value = relative_abundance_percent) %>%
+  arrange(upper_age) 
+  
+aq_emergent <- pollen_M1_F7_F9 %>%
+  filter(str_detect(habitat, "emergent")) %>%
+  droplevels() %>%
+  group_by(depth) %>%
+  mutate(total_sample = sum(count),
+         relative_abundance_percent = count / sum(count) * 100) %>%
+  filter(!total_sample==0) %>%
+  ungroup() %>%
+  select(depth, upper_age, lower_age, taxa, relative_abundance_percent) %>%
+  spread(key = taxa, value = relative_abundance_percent) %>%
+  arrange(upper_age) #sort by increasing time
+
+aq_submerged <- pollen_M1_F7_F9 %>%
+  filter(str_detect(habitat, "submerged")) %>%
+  droplevels() %>%
+  group_by(depth) %>%
+  mutate(total_sample = sum(count),
+         relative_abundance_percent = count / sum(count) * 100) %>%
+  filter(!total_sample==0) %>%
+  ungroup() %>%
+  select(depth, upper_age, lower_age, taxa, relative_abundance_percent) %>%
+  spread(key = taxa, value = relative_abundance_percent) %>%
+  arrange(upper_age) #sort by increasing time
+
+terrestrial <- pollen_M1_F7_F9 %>%
+  filter(str_detect(habitat, "terrestrial")) %>%
+  droplevels() %>%
+  group_by(depth) %>%
+  mutate(total_sample = sum(count),
+         relative_abundance_percent = count / sum(count) * 100) %>%
+  filter(!total_sample==0) %>%
+  ungroup() %>%
+  select(depth, upper_age, lower_age, taxa, relative_abundance_percent) %>%
+  spread(key = taxa, value = relative_abundance_percent) %>%
+  arrange(upper_age) #sort by increasing time
 
 ```
+
+## Check temporal resolution of composite pollen record
+```{r}
+pollen_M1_F7_F9_wide <- read.csv("outputs/pollen_M1_F7_F9_counts.csv")[-1]
+
+median(diff(pollen_M1_F7_F9_wide$upper_age))
+plot.ts(diff(pollen_M1_F7_F9_wide$upper_age))
+```
+
+### Run and Plot PrC trends
+```{r}
+pollen_df <- terrestrial
+
+# remove agedepth columns for Hellinger transformation and bind back
+agedepth <- pollen_df[,names(pollen_df) %in% c("core","depth", "upper_age", "lower_age")]
+pollen <- pollen_df[,!(names(pollen_df) %in% c("core","upper_age", "lower_age", "depth"))]
+
+# Transform data to Hellinger form
+pollen_hell <- decostand(pollen, method="hellinger")
+pollen_hell <- pollen_hell[rowSums(pollen_hell)>0,]
+
+test <- as.matrix(rowSums(pollen_hell))
+
+# Run Principal Curves and extract scores for then combining the resulting dataframe with agedepth
+# pollen.prc <- prcurve(pollen_hell, method = "ca", trace = TRUE, vary = TRUE, penalty = 1.4,
+#                       smoother = smoothGAM, bs="cr", family = mgcv::betar())
+pollen.prc <- prcurve(pollen_hell, method = "ca", trace = TRUE, vary = TRUE, penalty = 1.4)
+
+scrs_prc <- scores(pollen.prc, display = "curve")
+
+
+PollenPrC <- merge(agedepth, scrs_prc, by=0) 
+#PollenPrC <- cbind(agedepth, scrs_prc)
+
+# Plot Pcurves with depth and ages
+PollenPlot <- ggplot(PollenPrC, aes(x = upper_age, y = PrC)) +
+  geom_line() + 
+  geom_smooth() +
+  labs(y = "Pollen PrC", x = "Age (cal yr BP)", title = "") +
+  ggtitle("Pollen PrC")
+PollenPlot
+
+## save PrC for each pollen group
+aq_floating_prc <- PollenPrC
+aq_floating_prc$proxy <- "aq_floating"
+aq_emergent_prc <- PollenPrC
+aq_emergent_prc$proxy <- "aq_emergent"
+aq_submerged_prc <- PollenPrC #not working
+aq_submerged_prc$proxy <- "aq_emergent"
+poll_terrestrial_prc <- PollenPrC
+poll_terrestrial_prc$proxy <- "terrestrial"
+
+# Combine PrC datasets
+prc_df <- aq_floating_prc %>%
+  bind_rows(aq_emergent_prc,poll_terrestrial_prc) %>%
+  select(-c(1)) %>%
+  bind_rows(diatomsPrC)
+
+# Plot Pcurves with depth and ages
+PrC_plot <- ggplot(prc_df, aes(x = upper_age, y = PrC)) +
+  geom_line() + 
+  facet_wrap(~proxy, ncol=1,scales = "free_y")+
+  geom_smooth() +
+  labs(y = "Principal curve", x = "Age (cal yr BP)") +
+  scale_x_continuous(breaks=seq(0, 284000, by=40000)) +
+  ggtitle("Fuquene aquatic and terrestrial trends")
+PrC_plot
+
+ggsave("outputs/prc_composite_record.png",
+       plot = last_plot() ,
+       width = 10,
+       height=8,
+       units="in",
+       dpi = 300)
+
+```
+
 
 
 ## Geochemical and gran size datasets
@@ -461,8 +624,8 @@ F9_grainsize <- read.csv("data/Fuquene_F9_grainsize.csv") %>%
 #check median temporal resolution
 median(diff(F9_grainsize$upper_age))
 plot.ts(diff(F9_grainsize$upper_age))
-
 ```
+
 
 ```{r}
 ### Interpolation to the coarser dataset: geochemistry
