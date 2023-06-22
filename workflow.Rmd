@@ -60,7 +60,7 @@ new <- diatoms_save %>%
   mutate(taxa = plyr::mapvalues(taxa, from = nms_diat[,1], to = nms_diat[,2])) %>%
   group_by(depth, taxa, upper_age, lower_age) %>%
   summarise(count = sum(count)) %>%
-  filter(!count == "0" ) %>% #this is to remove empty samples (rows)
+  filter(!count == "0") %>% #this is to remove empty samples (rows)
   filter(!upper_age==0.0) %>% #this is to drop extraneous ages
   filter(!is.na(lower_age)) %>%
   ungroup() %>%
@@ -160,14 +160,26 @@ library(patchwork)
 
 theme_set(theme_bw(9))
 
+core_counts_common <- core_counts_common %>%
+  group_by(depth) %>%
+  mutate(total_sample = sum(count)) %>% 
+  filter(total_sample>100) %>%
+  mutate(relative_abundance_percent = count / sum(count) * 100) %>%
+  ungroup() %>%
+  filter(!is.na(elapsedTime)) %>%
+  mutate(spp = factor(taxa)) %>%
+  droplevels()
+
+levels(core_counts_common$taxa)
+
 # Plot  
 diat_plot <- ggplot(core_counts_common, aes(x = relative_abundance_percent, y = upper_age)) +
   geom_col_segsh() +
   scale_y_reverse() +
   facet_abundanceh(vars(taxa)) +
-  labs(x = "Relative abundance (%)", y = "Cal yr BP") +
+  labs(x = "Relative abundance (%)", y = "Cal yr BP") 
   # add CONISS zones
-  geom_hline(yintercept = zones, col = "blue", lty = 1, alpha = 0.7) 
+  #geom_hline(yintercept = zones, col = "blue", lty = 1, alpha = 0.7) 
 diat_plot
 
 ## Plot with diatom groups
@@ -702,7 +714,6 @@ This chunk is reproducible for pollen
 agedepth <- F_diatoms[, names(F_diatoms) %in% c("depth", "upper_age", "lower_age", "core")] 
 diat <- F_diatoms[, !names(F_diatoms) %in% c("depth", "upper_age", "lower_age", "core")]
 diat[is.na(diat)] <- 0
-agedepth$elapsed <- round(abs(agedepth$upper_age - agedepth$lower_age),0)
 
 #Select most common species 
 criteria <- 0.2 #% of the total samples
@@ -714,7 +725,7 @@ diatoms <- cbind(agedepth, diat_red)
 #this is to transform to tidy format, calculate % and subset more common species
 diat_data <- diatoms %>% 
   gather(key = taxa, value = count, -depth, -upper_age, -lower_age, -core) %>%
-  #mutate(taxa = plyr::mapvalues(taxa, from = changes[,1], to = changes$new_2)) %>%
+  mutate(taxa = plyr::mapvalues(taxa, from = nms_diat[,1], to = nms_diat[,2])) %>%
   group_by(depth) %>%
   mutate(total_sample = sum(count)) %>% 
   filter(!total_sample == "0") %>% #this is to remove empty samples
@@ -789,11 +800,12 @@ diat_plot_data <- mutate(diat_plot_data, se= c(as.numeric(diat_modS_fit$se.fit),
                          fit   = exp(fit))
 
 # For only one model
-# diat_plot_data <- gather(diat_plot_data, key=model, value=fit, modI_fit)
-# diat_plot_data <- mutate(diat_plot_data, se= c(as.numeric(diat_modI_fit$se.fit)),
-#                          upper = exp(fit + (2 * se)),
-#                          lower = exp(fit - (2 * se)),
-#                          fit   = exp(fit))
+diat_plot_data <- gather(diat_plot_data, key=model, value=fit, modI_fit)
+diat_plot_data <- mutate(diat_plot_data, se= c(as.numeric(diat_modI_fit$se.fit)),
+                         upper = exp(fit + (2 * se)),
+                         lower = exp(fit - (2 * se)),
+                         fit   = exp(fit))
+diat_plot_model_labels <- paste("Model", c("I"))
 
 #Plot the model output for non-shared trends, with means plus standard deviations for each model.
 diat_plot_model_labels <- paste("Model", c("S", "I"))
@@ -839,7 +851,7 @@ calc_1st_deriv = function(fit_before, fit_after,delta) {
 set.seed(10) #set a seed so this is repeatable
 n_sims = 250
 
-n_length = 240
+n_length = 200
 
 years <- seq(min(diat_plot_data$negAge),
              max(diat_plot_data$negAge),
@@ -944,54 +956,73 @@ write.csv(deriv_summaries, "outputs/diatom-derivatives.csv", row.names = FALSE)
 nms_pollen <- read.csv("data/nms_changes_pollen_M1_F7_F9_2RA.csv", sep = ",")
 head(nms_pollen)
 
+#Read the pollen data
+pollen_wide<- read.csv("outputs/pollen_M1_F7_F9_counts_2RA.csv")[-1]
+
+agedepth <- pollen_wide[, names(pollen_wide) %in% c("depth", "upper_age", "lower_age", "core")] 
+pollen_wide <- pollen_wide[, !names(pollen_wide) %in% c("depth", "upper_age", "lower_age", "core")]
+pollen_wide[is.na(pollen_wide)] <- 0
+
+#Select most common species 
+criteria <- 0.2 #% of the total samples
+
+n.occur <- apply(pollen_wide>0, 2, sum)
+pollen_red <- pollen_wide[, n.occur > (dim(pollen_wide)[1])*criteria] #
+pollen <- cbind(agedepth, pollen_red)
+
 ## Change pollen names and groups (>5% RA in at least one sample)
-pollen_longdata <- read.csv("outputs/pollen_M1_F7_F9_counts_2RA.csv")[-1] %>% #remove column core
+pollen_longdata <- pollen %>% #remove column core
   gather(key = taxa, value = count, -depth, -upper_age, -lower_age, -core) %>%
   mutate(taxa = plyr::mapvalues(taxa, from = nms_pollen[,1], to = nms_pollen$new)) %>%
-  mutate(habitat = plyr::mapvalues(taxa, from = nms_pollen[,2], to = nms_pollen$aquatic_habitat)) %>%
+  mutate(habitat = plyr::mapvalues(taxa, from = nms_pollen[,2], to = nms_pollen$habitat)) %>%
+  mutate(group = plyr::mapvalues(taxa, from = nms_pollen[,2], to = nms_pollen$aquatic_habitat)) %>%
   group_by(depth) %>%
   mutate(total_sample = sum(count)) %>% 
   filter(!total_sample == "0") %>% #this is to remove empty samples
   mutate(log_total_counts = log10(total_sample+1)) %>%
   mutate(relative_abundance_percent = count / sum(count) * 100) %>%
   mutate(negAge = -upper_age) %>%
-  #mutate(AgeCE = upper_age*(-1)+1950) %>%
-  #filter(AgeCE >= "0") %>%
   mutate(elapsedTime = round(abs(upper_age - lower_age),0)) %>%
-  ungroup() %>%
-  group_by(depth, taxa) %>%
-  filter(relative_abundance_percent > 10) %>%
   filter(!is.na(elapsedTime)) %>%
   mutate(spp = factor(taxa)) %>%
   mutate(habitat=factor(habitat)) %>%
+  mutate(group=factor(group)) %>%
   ungroup() 
 
 levels(pollen_longdata$spp)
 levels(pollen_longdata$habitat)
+levels(pollen_longdata$group)
 
 ## Separate aquatics and non-aquatics pollen
+aq_pollen <- pollen_longdata %>%
+  filter(str_detect(habitat, "Aquatic")) %>%
+  droplevels() %>%
+  arrange(upper_age) 
+
+
 aq_floating <- pollen_longdata %>%
-  filter(str_detect(habitat, "floating")) %>%
+  filter(str_detect(group, "floating")) %>%
   droplevels() %>%
   arrange(upper_age) 
 
 aq_emergent <- pollen_longdata %>%
-  filter(str_detect(habitat, "emergent")) %>%
+  filter(str_detect(group, "emergent")) %>%
   droplevels() %>%
   arrange(upper_age)
 
 aq_submerged <- pollen_longdata %>%
-  filter(str_detect(habitat, "submerged")) %>%
+  filter(str_detect(group, "submerged")) %>%
   droplevels() %>%
   arrange(upper_age)
 
 terrestrial <- pollen_longdata %>%
-  filter(str_detect(habitat, "terrestrial")) %>%
+  filter(str_detect(group, "terrestrial")) %>%
   droplevels() %>%
   arrange(upper_age)
 
 # Set pollen dataset to model
 pollen_data <- terrestrial
+levels(pollen_data$spp)
 
 #model S HGAM : similar smootheness between groups (spp) without global smooth 
 set.seed(10) #set a seed so this is repeatable
@@ -1030,8 +1061,8 @@ AIC_table
 ## Here the synthetic data to predict should be over the range of diatom ages to get the same ages for the synchronous/asynchronous model
 
 #Create synthetic data to predict over a range of ages: here match with diatom samples
-pollen_plot_data <- with(pollen_longdata, as_tibble(expand.grid(negAge = seq(min(diat_data$negAge), max(diat_data$negAge)),
-                                                        spp = factor(levels(pollen_longdata$spp)),
+pollen_plot_data <- with(pollen_data, as_tibble(expand.grid(negAge = seq(min(diat_data$negAge), max(diat_data$negAge)),
+                                                        spp = factor(levels(pollen_data$spp)),
                                                         log_total_counts = mean(log_total_counts))))
 
 
@@ -1072,7 +1103,7 @@ pollen_plot <- ggplot(pollen_plot_data) +
                   ymax = upper,
                   fill = model),
               alpha=0.2)+
-  geom_point(data= pollen_longdata, aes(x = negAge, y = count), size=0.06) +
+  geom_point(data= pollen_data, aes(x = negAge, y = count), size=0.06) +
   geom_line(aes(x = negAge, y = fit, color = model))+
   labs(y = "Absolute counts", x = "Age (cal yr BP)") +
   scale_fill_brewer(name = "", palette = "Dark2",
@@ -1108,18 +1139,18 @@ calc_1st_deriv = function(fit_before, fit_after,delta) {
 set.seed(10) #set a seed so this is repeatable
 n_sims = 250
 
-n_length = 240
+n_length = 200
 
 years <- seq(min(pollen_plot_data$negAge),
              max(pollen_plot_data$negAge),
              length.out = n_length)
 
 diff(years)
-model <- pollen_gam_S
-#model <- diatom_gam_I
+#model <- pollen_gam_S
+model <- pollen_gam_I
 
-pred <- pollen_modS_fit
-#pred <- pollen_modI_fit
+#pred <- pollen_modS_fit
+pred <- pollen_modI_fit
 
 # Generate multivariate normal simulations of model coefficients
 random_coefs <- t(rmvn(n_sims, mu = coef(model),V = vcov(model)))
@@ -1202,7 +1233,7 @@ sd_plot <- deriv_summaries %>%
 sd_plot
 
 ## save derivative summaries for later use
-write.csv(deriv_summaries, "outputs/pollen-derivatives.csv", row.names = FALSE)
+write.csv(deriv_summaries, "outputs/pollen-aquatics-derivatives.csv", row.names = FALSE)
 ```
 
 ### Geochemistry and grainsize HGAM
