@@ -778,9 +778,9 @@ diat_plot_data <- with(diat_data, as_tibble(expand.grid(negAge = seq(min(diat_da
                                                         spp = factor(levels(diat_data$spp)),
                                                         log_total_counts = mean(log_total_counts))))
 
-# diat_modS_fit <- predict(diatom_gam_S, 
-#                          newdata = diat_plot_data,
-#                          se.fit = TRUE)
+diat_modS_fit <- predict(diatom_gam_S,
+                         newdata = diat_plot_data,
+                         se.fit = TRUE)
 
 diat_modI_fit <- predict(diatom_gam_I,
                          newdata = diat_plot_data,
@@ -800,12 +800,12 @@ diat_plot_data <- mutate(diat_plot_data, se= c(as.numeric(diat_modS_fit$se.fit),
                          fit   = exp(fit))
 
 # For only one model
-diat_plot_data <- gather(diat_plot_data, key=model, value=fit, modI_fit)
-diat_plot_data <- mutate(diat_plot_data, se= c(as.numeric(diat_modI_fit$se.fit)),
-                         upper = exp(fit + (2 * se)),
-                         lower = exp(fit - (2 * se)),
-                         fit   = exp(fit))
-diat_plot_model_labels <- paste("Model", c("I"))
+# diat_plot_data <- gather(diat_plot_data, key=model, value=fit, modI_fit)
+# diat_plot_data <- mutate(diat_plot_data, se= c(as.numeric(diat_modI_fit$se.fit)),
+#                          upper = exp(fit + (2 * se)),
+#                          lower = exp(fit - (2 * se)),
+#                          fit   = exp(fit))
+# diat_plot_model_labels <- paste("Model", c("I"))
 
 #Plot the model output for non-shared trends, with means plus standard deviations for each model.
 diat_plot_model_labels <- paste("Model", c("S", "I"))
@@ -999,7 +999,6 @@ aq_pollen <- pollen_longdata %>%
   droplevels() %>%
   arrange(upper_age) 
 
-
 aq_floating <- pollen_longdata %>%
   filter(str_detect(group, "floating")) %>%
   droplevels() %>%
@@ -1021,14 +1020,14 @@ terrestrial <- pollen_longdata %>%
   arrange(upper_age)
 
 # Set pollen dataset to model
-pollen_data <- terrestrial
+pollen_data <- aq_submerged
 levels(pollen_data$spp)
 
 #model S HGAM : similar smootheness between groups (spp) without global smooth 
 set.seed(10) #set a seed so this is repeatable
-pollen_gam_S <- gam(count ~ s(negAge, spp, k=30, bs="fs") + offset(log_total_counts),
+pollen_gam_S <- gam(count ~ s(negAge, spp, k=20, bs="fs") + offset(log_total_counts),
                     weights = elapsedTime/mean(elapsedTime),
-                    data=pollen_data, family = nb, #places notes at the deciles of sample ages
+                    data=pollen_data, family = nb, 
                     method = "REML")
 
 summary(pollen_gam_S)
@@ -1036,7 +1035,7 @@ gam.check(pollen_gam_S)
 draw(pollen_gam_S)
 
 #model I HGAM: different smootheness for each taxa without global smooth
-pollen_gam_I<- gam(count ~ s(negAge, by=spp, k=30, bs="fs") +
+pollen_gam_I<- gam(count ~ s(negAge, by=spp, k=20, bs="fs") +
                      s(spp, bs="re") + offset(log_total_counts),
                    weights = elapsedTime/mean(elapsedTime),
                    data=pollen_data, family = nb, #places notes at the deciles of sample ages
@@ -1124,7 +1123,7 @@ ggsave("outputs/pollen_plot.png",
 
 
 ## save model results for later use
-write.csv(pollen_plot_data, "outputs/pollen-HGAMs-fitted-values.csv", row.names = FALSE)
+write.csv(pollen_plot_data, "outputs/pollen-emergent-HGAMs-fitted-values.csv", row.names = FALSE)
 ```
 
 
@@ -1146,10 +1145,10 @@ years <- seq(min(pollen_plot_data$negAge),
              length.out = n_length)
 
 diff(years)
-#model <- pollen_gam_S
+model <- pollen_gam_S
 model <- pollen_gam_I
 
-#pred <- pollen_modS_fit
+pred <- pollen_modS_fit
 pred <- pollen_modI_fit
 
 # Generate multivariate normal simulations of model coefficients
@@ -1233,7 +1232,7 @@ sd_plot <- deriv_summaries %>%
 sd_plot
 
 ## save derivative summaries for later use
-write.csv(deriv_summaries, "outputs/pollen-aquatics-derivatives.csv", row.names = FALSE)
+write.csv(deriv_summaries, "outputs/pollen-aquatic-derivatives.csv", row.names = FALSE)
 ```
 
 ### Geochemistry and grainsize HGAM
