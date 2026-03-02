@@ -1,0 +1,90 @@
+﻿old;new_1;new_2_groups;new_3_fragilarioids;group;Cell_size;Life_form;Attachment
+Aulacoseira italica;Aulacoseira italica;Aulacoseira italica;Aulacoseira italica;non-motile planktonic;macro;Colonial;unattached
+A.d.cf.laev;Aulacoseira cf laevis;Aulacoseira cf laevis;Aulacoseira cf laevis;non-motile planktonic;macro;Colonial;unattached
+Aulacoseira ambigua;Aulacoseira ambigua;Aulacoseira ambigua;Aulacoseira ambigua;non-motile planktonic;macro;Colonial;unattached
+Aulacoseira herzogii;Aulacoseira herzogii;Aulacoseira herzogii;Aulacoseira herzogii;non-motile planktonic;macro;Colonial;unattached
+A.g.var.angu;Aulacoseira granulata var. angustissima;Aulacoseira granulata var. angustissima;Aulacoseira granulata var. angustissima;non-motile planktonic;micro;Colonial;unattached
+A.granul;Aulacoseira granulata;Aulacoseira granulata;Aulacoseira granulata;non-motile planktonic;macro;Colonial;unattached
+Discostella stelligera;Discostella stelligera;Discostella stelligera;Discostella stelligera;non-motile planktonic;micro;Solitary;unattached
+Cyclotella meneghiniana;Cyclotella meneghiniana;Cyclotella meneghiniana;Cyclotella meneghiniana;non-motile planktonic;meso;Solitary;unattached
+Cocconeis placentula;Cocconeis placentula;Cocconeis placentula;Cocconeis placentula;non-motile benthic;micro;Sol_disc_shaped;Postrate
+Cymbella 308;Cymbella 308;Cymbella 308;Cymbella 308;Slightly_weakly_mod motile ;macro;Solitary;PadStalks
+Cymbella minor;Cymbella minor;Cymbella minor;Cymbella minor;Slightly_weakly_mod motile ;micro;Solitary;PadStalks
+Cymbella minuta;Encyonema minutum;Encyonema minutum;Encyonema minutum;Slightly_weakly_mod motile ;micro;Solitary;PadStalks
+C.silesiaca;Cymbella silesiacum;Cymbella silesiacum;Cymbella silesiacum;Slightly_weakly_mod motile ;macro;Solitary;PadStalks
+C.gracilis;Cymbella gracilis;Cymbella gracilis;Cymbella gracilis;Slightly_weakly_mod motile ;macro;Solitary;PadStalks
+Eunotia monodon;Eunotia monodon;Eunotia monodon;Eunotia monodon;Slightly_weakly_mod motile ;micro;Sol_elongated;Postrate
+Eunotia naeglii;Eunotia naeglii;Eunotia naeglii;Eunotia naeglii;Slightly_weakly_mod motile ;nano;Colonial;Postrate
+Eunotia flexuosa;Eunotia flexuosa;Eunotia flexuosa;Eunotia flexuosa;Slightly_weakly_mod motile ;micro;Colonial;Postrate
+Eunotia formica;Eunotia formica;Eunotia formica;Eunotia formica;Slightly_weakly_mod motile ;meso;Colonial;Postrate
+Eunotia minor;Eunotia minor;Eunotia minor;Eunotia minor;Slightly_weakly_mod motile ;macro;Sol_elongated;Postrate
+Eu.soleirolii;Eunotia soleirolii;Eunotia soleirolii;Eunotia soleirolii;Slightly_weakly_mod motile ;nano;Sol_elongated;Postrate
+Eu.bilun.var.bi;Eunotia bilunaris;Eunotia bilunaris;Eunotia bilunaris;Slightly_weakly_mod motile ;meso;Sol_elongated;Postrate
+Eunotia sudetica?;Eunotia cf sudetica;Eunotia cf sudetica;Eunotia cf sudetica;Slightly_weakly_mod motile ;meso;Sol_elongated;Postrate
+Eunotia flexuosa;Eunotia flexuosa;Eunotia flexuosa;Eunotia flexuosa;Slightly_weakly_mod motile ;meso;Sol_elongated;Postrate
+Eunotia serra;Eunotia serra;Eunotia serra;Eunotia serra;Slightly_weakly_mod motile ;meso;Sol_elongated;Postrate
+Eunotia intermedia;Eunotia intermedia;Eunotia intermedia;Eunotia intermedia;Slightly_weakly_mod motile ;meso;Sol_elongated;Postrate
+Epithemia turgida;Epithemia turgida;Epithemia turgida;Epithemia turgida;Slightly_weakly_mod motile ;very_large;Sol_elongated;Postrate
+E.sorex;Eunotia sorex;Eunotia sorex;Eunotia sorex;Slightly_weakly_mod motile ;very_large;Sol_elongated;Postrate
+E.adnata;Eunotia adnata;Eunotia adnata;Eunotia adnata;Slightly_weakly_mod motile ;very_large;Sol_elongated;Postrate
+Epithemia spp;Epithemia spp;Epithemia spp;Epithemia spp;Slightly_weakly_mod motile ;very_large;Sol_elongated;Postrate
+Diploenis ovalis;Diploneis ovalis;Diploneis ovalis;Diploneis ovalis;Slightly_weakly_mod motile ;very_large;Sol_elongated;unattached
+Pseudostaurosira elliptica;Pseudostaurosira elliptica;Pseudostaurosira elliptica;Small Fragilarioids;non-motile tychoplanktonic;micro;Colonial;unattached
+Pseudostaurosira zeilleri;Pseudostaurosira zeilleri;Pseudostaurosira zeilleri;Small Fragilarioids;non-motile tychoplanktonic;micro;Colonial;unattached
+Pseudostaurosira trainorii;Pseudostaurosira trainorii;Pseudostaurosira trainorii;Small Fragilarioids;non-motile tychoplanktonic;micro;Colonial;unattached
+Pseudostaurosirella sp (como pinnata pero mas larga);Staurosirella cf pinnata;Small Staurosirella;Small Fragilarioids;non-motile tychoplanktonic;micro;Colonial;unattached
+Staurosira construens;Staurosira construens;Staurosira construens;Small Fragilarioids;non-motile tychoplanktonic;meso;Colonial;unattached
+Frag contruens var venter;Staurosira construens var venter;Staurosira construens var venter;Small Fragilarioids;non-motile tychoplanktonic;meso;Colonial;unattached
+Staurosirella pinnata;Staurosirella pinnata;Small Staurosirella;Small Fragilarioids;non-motile tychoplanktonic;micro;Colonial;unattached
+St construens var exigua;Staurosira construens var exigua;Small Staurosirella;Small Fragilarioids;non-motile tychoplanktonic;micro;Colonial;unattached
+Pseudostaurosira brevistriata;Pseudostaurosira brevistriata;Pseudostaurosira brevistriata;Small Fragilarioids;non-motile tychoplanktonic;micro;Colonial;unattached
+Pseudostaurosirella parasitica;Pseudostaurosira parasitica;Pseudostaurosira parasitica;Small Fragilarioids;non-motile tychoplanktonic;micro;Colonial;unattached
+Staurosira construens (deformed);Staurosira construens;Staurosira construens;Small Fragilarioids;non-motile tychoplanktonic;micro;Colonial;unattached
+Staurosirella cf berolinensis;Staurosirella cf berolinensis;Small Staurosirella;Small Fragilarioids;non-motile tychoplanktonic;micro;Colonial;unattached
+St leptostauron;Staurosirella leptostauron;Small Staurosirella;Small Fragilarioids;non-motile tychoplanktonic;micro;Colonial;unattached
+St parasitica;Pseudostaurosira parasitica;Pseudostaurosira parasitica;Small Fragilarioids;non-motile tychoplanktonic;micro;Colonial;unattached
+P. mimetica;Pseudostaurosira mimetica;Pseudostaurosira mimetica;Small Fragilarioids;non-motile tychoplanktonic;meso;Colonial;unattached
+St rhomboides;Staurosirella rhomboides;Staurosirella rhomboides;Small Fragilarioids;non-motile tychoplanktonic;micro;Colonial;unattached
+Stauroneis phoenicenteron;Stauroneis phoenicenteron;Stauroneis phoenicenteron;Stauroneis phoenicenteron;non-motile tychoplanktonic;very_large;Sol_elongated;Prostrate
+Fragilaria tenera;Fragilaria tenera;Fragilaria tenera;Fragilaria tenera;non-motile tychoplanktonic;nano;pseudofilamentous;Mucilage_tubes
+Tabellaria flocculosa;Tabellaria flocculosa;Tabellaria flocculosa;Tabellaria flocculosa;non-motile tychoplanktonic;very_large;pseudofilamentous;unattached
+Gomphosphenia lingulatiformis;Gomphosphenia lingulatiformis;Gomphosphenia lingulatiformis;Gomphosphenia lingulatiformis;Slightly_weakly_mod motile ;micro;Colonial;PadStalks
+Gomphosphenia sp;Gomphosphenia sp;Gomphosphenia sp;Gomphosphenia sp;Slightly_weakly_mod motile ;micro;Colonial;PadStalks
+Gomph gracile;Gomphonema gracile;Gomphonema gracile;Gomphonema gracile;Slightly_weakly_mod motile ;macro;Sol_elongated;PadStalks
+Gomphonema parvulum;Gomphonema parvulum;Gomphonema parvulum;Gomphonema parvulum;Slightly_weakly_mod motile ;micro;Colonial;PadStalks
+Gomphonema aff mexicanum;Gomphonema aff mexicanum;Gomphonema aff mexicanum;Gomphonema aff mexicanum;Slightly_weakly_mod motile ;very_large;Sol_elongated;PadStalks
+G.truncatum;Gomphonema truncatum;Gomphonema truncatum;Gomphonema truncatum;Slightly_weakly_mod motile ;macro;Sol_elongated;PadStalks
+G.angustum;Gomphonema angustum;Gomphonema angustum;Gomphonema angustum;Slightly_weakly_mod motile ;macro;Sol_elongated;PadStalks
+Brachysira brebisonii;Brachysira brebisonii;Brachysira brebisonii;Brachysira brebisonii;Slightly_weakly_mod motile ;meso;Solitary;unattached
+B.vitrea;Brachysira vitrea;Brachysira vitrea;Brachysira vitrea;Slightly_weakly_mod motile ;micro;Solitary;unattached
+Frustulia rhomboides;Frustulia rhomboides;Frustulia rhomboides;Frustulia rhomboides;Slightly_weakly_mod motile ;micro;Sol_elongated;PadStalks
+Craticula riparia;Craticula riparia;Craticula riparia;Craticula riparia;highly motile;meso;Solitary;unattached
+Navicula cryptotenella;Navicula cryptotenella;Navicula cryptotenella;Navicula cryptotenella;Slightly_weakly_mod motile ;micro;Sol_elongated;unattached
+Navicula radiosa;Navicula radiosa;Navicula radiosa;Navicula radiosa;Slightly_weakly_mod motile ;very_large;Sol_elongated;unattached
+Mayamaea sp;Mayamaea sp;Mayamaea sp;Mayamaea sp;Slightly_weakly_mod motile ;micro;Sol_elongated;unattached
+N.pseudov;Navicula spp;Navicula spp;Navicula spp;Slightly_weakly_mod motile ;micro;Sol_elongated;unattached
+Neidium iridis;Neidium iridis;Neidium iridis;Neidium iridis;Slightly_weakly_mod motile ;micro;Sol_elongated;unattached
+Nitzschia amphibia;Nitzschia amphibia;Nitzschia amphibia;Nitzschia amphibia;Slightly_weakly_mod motile ;meso;Sol_elongated;Postrate
+Nitzschia palea;Nitzschia palea;Nitzschia palea;Nitzschia palea;Slightly_weakly_mod motile ;nano;Sol_elongated;Postrate
+Orthoseira dendroteres;Orthoseira dendroteres;Orthoseira dendroteres;Orthoseira dendroteres;Slightly_weakly_mod motile ;very_large;pseudofilamentous;unattached
+Orthoseira roeseana;Orthoseira roeseana;Orthoseira roeseana;Orthoseira roeseana;non-motile planktonic;very_large;pseudofilamentous;unattached
+Luticula mutica;Luticula mutica;Luticula mutica;Luticula mutica;Slightly_weakly_mod motile ;micro;Sol_elongated;unattached
+Pinnularia borealis;Pinnularia borealis;Pinnularia borealis;Pinnularia borealis;Slightly_weakly_mod motile ;very_large;Sol_elongated;unattached
+Pinnularia gibba;Pinnularia gibba;Pinnularia gibba;Pinnularia gibba;Slightly_weakly_mod motile ;very_large;Sol_elongated;unattached
+Pinnularia spp;Pinnularia spp;Pinnularia spp;Pinnularia spp;Slightly_weakly_mod motile ;very_large;Sol_elongated;unattached
+Pinnularia acrosphaeria;Pinnularia acrosphaeria;Pinnularia acrosphaeria;Pinnularia acrosphaeria;Slightly_weakly_mod motile ;very_large;Sol_elongated;unattached
+Pinnularia (lg);Pinnularia spp;Pinnularia spp;Pinnularia spp;Slightly_weakly_mod motile ;very_large;Sol_elongated;unattached
+Pinnularia viridis;Pinnularia viridis;Pinnularia viridis;Pinnularia viridis;Slightly_weakly_mod motile ;very_large;Sol_elongated;unattached
+P. abaujensis v linearis;Pinnularia abaujensis var linearis;Pinnularia abaujensis var linearis;Pinnularia abaujensis var linearis;Slightly_weakly_mod motile ;very_large;Sol_elongated;unattached
+Pinnularia maior;Pinnularia maior;Pinnularia maior;Pinnularia maior;Slightly_weakly_mod motile ;very_large;Sol_elongated;unattached
+Pinnularia brevicostata ?;Pinnularia aff breviscostata;Pinnularia aff breviscostata;Pinnularia aff breviscostata;Slightly_weakly_mod motile ;very_large;Sol_elongated;unattached
+Achnanthes minutissima;Achnanthidium minutissimum;Achnanthidium minutissimum;Achnanthidium minutissimum;Slightly_weakly_mod motile ;nano;Sol_elongated;Postrate
+Amphora ovalis;Amphora ovalis;Amphora ovalis;Amphora ovalis;Slightly_weakly_mod motile ;macro;Colonial;unattached
+Amphora veneta;Amphora veneta;Amphora veneta;Amphora veneta;Slightly_weakly_mod motile ;micro;Colonial;unattached
+Achnanthes lanceolata;Achnanthes lanceolata;Achnanthes lanceolata;Achnanthes lanceolata;Slightly_weakly_mod motile ;nano;Sol_elongated;Postrate
+Achnanthes spp;Achnanthes spp;Achnanthes spp;Achnanthes spp;Slightly_weakly_mod motile ;nano;Sol_elongated;Postrate
+Lemnicola hungarica;Lemnicola hungarica;Lemnicola hungarica;Lemnicola hungarica;Slightly_weakly_mod motile ;micro;Sol_disc_shaped;Postrate
+Navicula spp;Navicula spp;Navicula spp;Navicula spp;Slightly_weakly_mod motile ;very_large;Sol_elongated;unattached
+Rhopalodia gibba;Rhopalodia gibba;Rhopalodia gibba;Rhopalodia gibba;Slightly_weakly_mod motile ;very_large;Sol_elongated;Prostrate
+Gyrosigma acuminatum;Gyrosigma acuminatum;Gyrosigma acuminatum;Gyrosigma acuminatum;highly motile;very_large;Solitary;unattached
+Sellaphora alastos;Sellaphora alastos;Sellaphora alastos;Sellaphora alastos;Slightly_weakly_mod motile ;very_large;Sol_elongated;unattached
