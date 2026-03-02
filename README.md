@@ -12,7 +12,8 @@ This repository contains the necessary data and code to reproduce the statistica
 ## Main numerical steps:
 + Clean data and estimate Principal Curves for each assemblage (pollen and diatoms)
 + Plot stratigraphical floristic changes over time to identify periods of change
-+ Interpolate PrC from coarser, explicative variables (aquatic and terrestrial PrC) to lower resolution, responsive variables (diatom abundances) resolution 
++ Interpolate PrC from coarser, explanatory variables (aquatic and terrestrial PrC) to lower resolution, responsive variables (diatom abundances) resolution 
++ Functional diversity analyses: how changes in lake habitat size did influence niche occupation by functionally similar diatom assemblages?
 + Distributed Hierarchical Generalized Additive Models (DHGAM)
 
 ## Folders

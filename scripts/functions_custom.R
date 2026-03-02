@@ -1,4 +1,4 @@
-## Functions from 
+## Functions from Jovanovska et al. on diatom assembly processes in Lake Ohrid https://github.com/thauffe/OhridDiatomAssembly 
 # -----------------------------------------------------------------------------
 
 getSesFric <- function (Comm, TraitsScaled, Runs, Ncores) {
