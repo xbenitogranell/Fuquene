@@ -1,5 +1,5 @@
 # Fuquene
-Multiproxy analysis of the 250-yr Lake Fuquene record (submitted Communications Earth and Environment).
+Multiproxy analysis of the 250-yr Lake Fuquene record (submitted to Ecography).
 This repository contains the necessary data and code to reproduce the statistical analyses and generate the main plots. 
 
 ## Study area and datasets description
